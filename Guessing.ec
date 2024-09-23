@@ -380,8 +380,8 @@ module Memory : MEMORY = {
 }.
 
 (* glob Memory is the tuple type with the global variables of Memory
-   in alphabetical; this is planned by the EasyCrypt developers to
-   be turned into a more usable record type *)
+   in alphabetical order; this is planned by the EasyCrypt developers
+   to be turned into a more usable record type *)
 
 type gm = glob Memory.
 
