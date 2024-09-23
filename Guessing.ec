@@ -380,19 +380,18 @@ module Memory : MEMORY = {
 }.
 
 (* glob Memory is the tuple type with the global variables of Memory
-   in *reverse* order; this is planned by the EasyCrypt developers to
-   be turned into a more usable record type, but for now we need
-   operators for accessing and updating *)
+   in alphabetical; this is planned by the EasyCrypt developers to
+   be turned into a more usable record type *)
 
 type gm = glob Memory.
 
-op gm_to_next_key                  (gm : gm)  : key                 = gm.`7.
+op gm_to_next_key                  (gm : gm)  : key                 = gm.`5.
 op gm_to_next_phys_addr            (gm : gm)  : addr                = gm.`6.
-op gm_to_phys_map                  (gm : gm)  : (addr, object) fmap = gm.`5.
-op gm_to_honest_next_virt_addr     (gm : gm)  : addr                = gm.`4.
-op gm_to_honest_virt_map           (gm : gm)  : (addr, addr) fmap   = gm.`3.
-op gm_to_malicious_next_virt_addr  (gm : gm)  : addr                = gm.`2.
-op gm_to_malicious_virt_map        (gm : gm)  : (addr, addr) fmap   = gm.`1.
+op gm_to_phys_map                  (gm : gm)  : (addr, object) fmap = gm.`7.
+op gm_to_honest_next_virt_addr     (gm : gm)  : addr                = gm.`1.
+op gm_to_honest_virt_map           (gm : gm)  : (addr, addr) fmap   = gm.`2.
+op gm_to_malicious_next_virt_addr  (gm : gm)  : addr                = gm.`3.
+op gm_to_malicious_virt_map        (gm : gm)  : (addr, addr) fmap   = gm.`4.
 
 lemma gm_eqP (gm1 gm2 : gm) :
   gm_to_next_key gm1 = gm_to_next_key gm2 =>
@@ -928,20 +927,25 @@ op cell_addr_to_cell (pty : party, gm : gm, cell_addr : addr) : cell =
 lemma good_cell_addr_key_in_mem (pty : party, gm : gm, cell_addr : addr) :
   gm_invar gm => cell_addr_good pty gm cell_addr =>
   exists (key_addr : addr),
-  gm.`5.[key_addr] = Some (Key (cell_addr_to_cell pty gm cell_addr).`key).
+  (gm_to_phys_map gm).[key_addr] =
+  Some (Key (cell_addr_to_cell pty gm cell_addr).`key).
 proof.
 move => gmi_gm.
 rewrite /cell_addr_good /cell_addr_to_cell.
 case pty => /=.
 move => [H1 H2].
 have [cell H3] : 
-  exists cell, oget gm.`5.[oget gm.`3.[cell_addr]] = Cell cell
-  by smt().
+  exists cell,
+  oget (gm_to_phys_map gm)
+         .[oget (gm_to_honest_virt_map gm).[cell_addr]] =
+  Cell cell by smt().
 rewrite /get_as_Cell H3 /= /#.
 move => [H1 H2].
 have [cell H3] : 
-  exists cell, oget gm.`5.[oget gm.`1.[cell_addr]] = Cell cell
-  by smt().
+  exists cell,
+  oget (gm_to_phys_map gm)
+         .[oget (gm_to_malicious_virt_map gm).[cell_addr]] =
+  Cell cell by smt().
 rewrite /get_as_Cell H3 /= /#.
 qed.
 
@@ -4363,15 +4367,16 @@ rewrite /gm_to_phys_map /=.
 have -> :
   oget Memory.honest_virt_map{hr}.[cell_addr{hr}] =
   cell_phys_addr by smt().
-have doms_eq : fdom gm1.`5 = fdom Memory.phys_map{hr} by smt().
+have doms_eq :
+  fdom (gm_to_phys_map gm1) = fdom Memory.phys_map{hr} by smt().
 apply fmap_eqP => p_addr.
 case (p_addr = cell_phys_addr) => [-> | neq].
 have -> : cell{hr}.`key = key by smt().
 have -> : cell{hr}.`locked = true by smt().
 rewrite get_set_sameE /#.
 rewrite get_setE neq /=.
-case (p_addr \in gm1.`5) => [/# | not_in_dom].
-have -> : gm1.`5.[p_addr] = None by rewrite -domNE.
+case (p_addr \in (gm_to_phys_map gm1)) => [/# | not_in_dom].
+have -> : (gm_to_phys_map gm1).[p_addr] = None by rewrite -domNE.
 have -> // : Memory.phys_map{hr}.[p_addr] = None
   by rewrite -domNE -mem_fdom -doms_eq mem_fdom.
 auto; smt().
