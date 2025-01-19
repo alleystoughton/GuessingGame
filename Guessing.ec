@@ -2764,7 +2764,7 @@ seq 1 :
      Memory.malicious_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2])).
 exlim (glob Memory) => gm.
 call (MaliciousMemory.party_memory_unlock_cell gm 0 1).
-auto; smt(mem_set get_setE).
+auto; progress; smt(mem_set get_setE).
 match Some 1; first auto; smt().
 wp.
 exlim (glob Memory) => gm.
@@ -6644,7 +6644,9 @@ exlim (glob Memory){1} => gm1.
 call{2}
   (simulator_modify_cell_gm_rel_invar_chooser gm1 cell_addr' cell_phys_addr'
    key' choice').
-auto; progress [-delta]; first 3 smt().
+auto; progress [-delta].
+rewrite /get_as_SHPS_Chooser_WaitFromIPChoice /= /# in H.
+smt(). smt().
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
    choice{1} key_addr' guess{2}) /#.
@@ -7391,7 +7393,7 @@ end section.
 
    assuming we resrict ourselves to Malicious and Adv being
    non-probabilistic, we can conclude that the real experiment results
-   in true iff the ideal experiement does *)
+   in true iff the ideal experiment does *)
 
 lemma Security
       (Malicious <:
