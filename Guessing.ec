@@ -385,13 +385,13 @@ module Memory : MEMORY = {
 
 type gm = glob Memory.
 
-op gm_to_next_key                  (gm : gm)  : key                 = gm.`5.
-op gm_to_next_phys_addr            (gm : gm)  : addr                = gm.`6.
-op gm_to_phys_map                  (gm : gm)  : (addr, object) fmap = gm.`7.
-op gm_to_honest_next_virt_addr     (gm : gm)  : addr                = gm.`1.
-op gm_to_honest_virt_map           (gm : gm)  : (addr, addr) fmap   = gm.`2.
-op gm_to_malicious_next_virt_addr  (gm : gm)  : addr                = gm.`3.
-op gm_to_malicious_virt_map        (gm : gm)  : (addr, addr) fmap   = gm.`4.
+op gm_to_next_key                 (gm : gm)  : key                 = gm.`5.
+op gm_to_next_phys_addr           (gm : gm)  : addr                = gm.`6.
+op gm_to_phys_map                 (gm : gm)  : (addr, object) fmap = gm.`7.
+op gm_to_honest_next_virt_addr    (gm : gm)  : addr                = gm.`1.
+op gm_to_honest_virt_map          (gm : gm)  : (addr, addr) fmap   = gm.`2.
+op gm_to_malicious_next_virt_addr (gm : gm)  : addr                = gm.`3.
+op gm_to_malicious_virt_map       (gm : gm)  : (addr, addr) fmap   = gm.`4.
 
 lemma gm_eqP (gm1 gm2 : gm) :
   gm_to_next_key gm1 = gm_to_next_key gm2 =>
