@@ -16,7 +16,6 @@
    protocol is secure as well. *)
 
 prover ["Z3" "Alt-Ergo"].  (* both must succeed for all smt goals *)
-timeout 2.  (* can be increased *)
 
 require import AllCore List FMap FSet.
 
