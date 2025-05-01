@@ -159,7 +159,7 @@ module Memory : MEMORY = {
   var honest_virt_map    : (addr, addr) fmap
 
   var malicious_next_virt_addr : addr
-  var malicious_virt_map : (addr, addr) fmap  
+  var malicious_virt_map : (addr, addr) fmap
 
   proc init() : unit = {
     next_key                 <- 0;
@@ -933,14 +933,14 @@ move => gmi_gm.
 rewrite /cell_addr_good /cell_addr_to_cell.
 case pty => /=.
 move => [H1 H2].
-have [cell H3] : 
+have [cell H3] :
   exists cell,
   oget (gm_to_phys_map gm)
          .[oget (gm_to_honest_virt_map gm).[cell_addr]] =
   Cell cell by smt().
 rewrite /get_as_Cell H3 /= /#.
 move => [H1 H2].
-have [cell H3] : 
+have [cell H3] :
   exists cell,
   oget (gm_to_phys_map gm)
          .[oget (gm_to_malicious_virt_map gm).[cell_addr]] =
@@ -1007,7 +1007,7 @@ case (addr = Memory.next_phys_addr{hr}) => [eq_addr_npa | neq_addr_npa].
 move : H5.
 rewrite get_setE eq_addr_npa /=.
 move => <- /=.
-pose cell1 := 
+pose cell1 :=
   oget
   (get_as_Cell
    (oget
@@ -1044,7 +1044,7 @@ case (addr = Memory.next_phys_addr{hr}) => [eq_addr_npa | neq_addr_npa].
 move : H6.
 rewrite get_setE eq_addr_npa /=.
 move => <- /=.
-pose cell1 := 
+pose cell1 :=
   oget
   (get_as_Cell
    (oget
@@ -1285,7 +1285,7 @@ module type PROTOCOL = {
      (the other party is then the guesser)  *)
 
   proc init(chooser : party) : unit
-  
+
   (* ask the party to accept a message from the adversary; the boolean
      says whether it was accepted *)
 
@@ -1887,7 +1887,7 @@ module RealProtocol (Honest : PARTY, Malicious : PARTY) : PROTOCOL = {
     end;
     Memory.init();  (* M and H can't use memory *)
   }
-  
+
   proc from_adv(party : party, msg : msg) : bool = {
     var b : bool;
     match party with
@@ -2951,9 +2951,9 @@ type sim_honest_output = [
 
 module type SIMULATOR = {
   (* initialize the simulator, telling it which party is the chooser *)
-  
+
   proc init(chooser : party) : unit
-  
+
   (* start the honest party *)
 
   proc honest_start() : unit
@@ -3035,7 +3035,7 @@ module IdealProtocol (Sim : SIMULATOR) : PROTOCOL = {
       | Malicious => IPS_Guesser_WaitFromAdvGuess
       end;
   }
-  
+
   proc from_adv(party : party, msg : msg) : bool = {
     var r : bool;
     match party with
@@ -3084,7 +3084,7 @@ module IdealProtocol (Sim : SIMULATOR) : PROTOCOL = {
       }
     | Malicious => {
         r <@ Sim.malicious_from_adv(msg);
-      }        
+      }
     end;
     return r;
   }
@@ -3119,7 +3119,7 @@ module IdealProtocol (Sim : SIMULATOR) : PROTOCOL = {
       }
     | Malicious => {
         r <@ Sim.malicious_to_adv();
-      }        
+      }
     end;
     return r;
   }
@@ -3609,7 +3609,7 @@ conseq
 proc; inline*; auto; smt().
 apply malic_contents_cell_gm_invar_equiv.
 qed.
-  
+
 lemma malicious_party_gm_invar_guesser_from_adv
       (cell_hon_virt_addr cell_phys_addr : addr, cont : bool)
       (Malicious <: PARTY{-Memory}) :
@@ -3621,7 +3621,7 @@ lemma malicious_party_gm_invar_guesser_from_adv
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont ==>
    ={glob Malicious, glob Memory, res} /\
-   gm_invar (glob Memory){1} /\ 
+   gm_invar (glob Memory){1} /\
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont].
 proof.
@@ -3630,7 +3630,7 @@ proc
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont) => //.
 by conseq
-   (malic_trans_virt_addr_gm_invar_guesser_equiv 
+   (malic_trans_virt_addr_gm_invar_guesser_equiv
     cell_hon_virt_addr cell_phys_addr cont).
 by conseq
    (malic_create_key_gm_invar_guesser_equiv
@@ -3663,7 +3663,7 @@ lemma malicious_party_gm_invar_guesser_to_adv
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont ==>
    ={glob Malicious, glob Memory, res} /\
-   gm_invar (glob Memory){1} /\ 
+   gm_invar (glob Memory){1} /\
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont].
 proof.
@@ -3672,7 +3672,7 @@ proc
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont) => //.
 by conseq
-   (malic_trans_virt_addr_gm_invar_guesser_equiv 
+   (malic_trans_virt_addr_gm_invar_guesser_equiv
     cell_hon_virt_addr cell_phys_addr cont).
 by conseq
    (malic_create_key_gm_invar_guesser_equiv
@@ -3705,7 +3705,7 @@ lemma malicious_party_gm_invar_guesser_from_other
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont ==>
    ={glob Malicious, glob Memory, res} /\
-   gm_invar (glob Memory){1} /\ 
+   gm_invar (glob Memory){1} /\
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont].
 proof.
@@ -3714,7 +3714,7 @@ proc
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont) => //.
 by conseq
-   (malic_trans_virt_addr_gm_invar_guesser_equiv 
+   (malic_trans_virt_addr_gm_invar_guesser_equiv
     cell_hon_virt_addr cell_phys_addr cont).
 by conseq
    (malic_create_key_gm_invar_guesser_equiv
@@ -3747,7 +3747,7 @@ lemma malicious_party_gm_invar_guesser_to_other
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont ==>
    ={glob Malicious, glob Memory, res} /\
-   gm_invar (glob Memory){1} /\ 
+   gm_invar (glob Memory){1} /\
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont].
 proof.
@@ -3756,7 +3756,7 @@ proc
    gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr
    cont) => //.
 by conseq
-   (malic_trans_virt_addr_gm_invar_guesser_equiv 
+   (malic_trans_virt_addr_gm_invar_guesser_equiv
     cell_hon_virt_addr cell_phys_addr cont).
 by conseq
    (malic_create_key_gm_invar_guesser_equiv
@@ -3803,7 +3803,7 @@ op gm_rel_invar_chooser
    (gm_to_phys_map gm2).[phys_addr'])                                     /\
   (forall (mal_virt_addr : addr),
    mal_virt_addr \in gm_to_malicious_virt_map gm1 =>
-   let phys_addr' = 
+   let phys_addr' =
      oget (gm_to_malicious_virt_map gm1).[mal_virt_addr] in
    oget (gm_to_phys_map gm1).[phys_addr'] <> Key key).
 
@@ -3814,10 +3814,10 @@ lemma gm_rel_invar_chooser_malic_key_not_accessible_gm2
   gm_rel_invar_chooser gm1 gm2 cell_hon_virt_addr cell_phys_addr key cont =>
   (forall (mal_virt_addr : addr),
    mal_virt_addr \in gm_to_malicious_virt_map gm2 =>
-   let phys_addr' = 
+   let phys_addr' =
      oget (gm_to_malicious_virt_map gm2).[mal_virt_addr] in
    oget (gm_to_phys_map gm2).[phys_addr'] <> Key key).
-proof. smt(). qed.  
+proof. smt(). qed.
 
 lemma malic_trans_virt_addr_gm_rel_invar_chooser_equiv
       (cell_hon_virt_addr cell_phys_addr : addr, key : key, cont : bool) :
@@ -3826,21 +3826,21 @@ lemma malic_trans_virt_addr_gm_rel_invar_chooser_equiv
    MaliciousMemory.PartyMemory.trans_virt_addr :
    ={addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 conseq
   (_ :
    ={addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){1} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont)
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
@@ -3861,20 +3861,20 @@ lemma malic_create_key_gm_rel_invar_chooser_equiv
   [MaliciousMemory.PartyMemory.create_key ~
    MaliciousMemory.PartyMemory.create_key :
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 conseq
   (_ :
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){1} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont)
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
@@ -3890,21 +3890,21 @@ lemma malic_is_key_gm_rel_invar_chooser_equiv
    MaliciousMemory.PartyMemory.is_key :
    ={key_addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 conseq
   (_ :
    ={key_addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){1} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont)
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
@@ -3920,21 +3920,21 @@ lemma malic_create_cell_gm_rel_invar_chooser_equiv
    MaliciousMemory.PartyMemory.create_cell :
    ={key_addr, b} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 conseq
   (_ :
    ={key_addr, b} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){1} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont)
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
@@ -3961,21 +3961,21 @@ lemma malic_is_cell_gm_rel_invar_chooser_equiv
    MaliciousMemory.PartyMemory.is_cell :
    ={cell_addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 conseq
   (_ :
    ={cell_addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){1} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont)
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
@@ -3991,21 +3991,21 @@ lemma malic_unlock_cell_gm_rel_invar_chooser_equiv
    MaliciousMemory.PartyMemory.unlock_cell :
    ={cell_addr, key_addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 conseq
   (_ :
    ={cell_addr, key_addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){1} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont)
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
@@ -4046,21 +4046,21 @@ lemma malic_contents_cell_gm_rel_invar_chooser_equiv
    MaliciousMemory.PartyMemory.contents_cell :
    ={cell_addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 conseq
   (_ :
    ={cell_addr} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){1} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont)
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
@@ -4077,19 +4077,19 @@ lemma malicious_party_gm_rel_invar_chooser_from_adv
    Malicious(MaliciousMemory.PartyMemory).from_adv :
    ={glob Malicious, msg} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={glob Malicious, res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 proc
   (gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont) => //.
 by conseq
-   (malic_trans_virt_addr_gm_rel_invar_chooser_equiv 
+   (malic_trans_virt_addr_gm_rel_invar_chooser_equiv
     cell_hon_virt_addr cell_phys_addr key cont).
 by conseq
    (malic_create_key_gm_rel_invar_chooser_equiv
@@ -4119,19 +4119,19 @@ lemma malicious_party_gm_rel_invar_chooser_to_adv
    Malicious(MaliciousMemory.PartyMemory).to_adv :
    ={glob Malicious} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={glob Malicious, res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 proc
   (gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont) => //.
 by conseq
-   (malic_trans_virt_addr_gm_rel_invar_chooser_equiv 
+   (malic_trans_virt_addr_gm_rel_invar_chooser_equiv
     cell_hon_virt_addr cell_phys_addr key cont).
 by conseq
    (malic_create_key_gm_rel_invar_chooser_equiv
@@ -4161,19 +4161,19 @@ lemma malicious_party_gm_rel_invar_chooser_from_other
    Malicious(MaliciousMemory.PartyMemory).from_other :
    ={glob Malicious, msg} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={glob Malicious, res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 proc
   (gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont) => //.
 by conseq
-   (malic_trans_virt_addr_gm_rel_invar_chooser_equiv 
+   (malic_trans_virt_addr_gm_rel_invar_chooser_equiv
     cell_hon_virt_addr cell_phys_addr key cont).
 by conseq
    (malic_create_key_gm_rel_invar_chooser_equiv
@@ -4203,19 +4203,19 @@ lemma malicious_party_gm_rel_invar_chooser_to_other
    Malicious(MaliciousMemory.PartyMemory).to_other :
    ={glob Malicious} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={glob Malicious, res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 proc
   (gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont) => //.
 by conseq
-   (malic_trans_virt_addr_gm_rel_invar_chooser_equiv 
+   (malic_trans_virt_addr_gm_rel_invar_chooser_equiv
     cell_hon_virt_addr cell_phys_addr key cont).
 by conseq
    (malic_create_key_gm_rel_invar_chooser_equiv
@@ -4269,21 +4269,21 @@ lemma honest_trans_virt_addr_of_cell_gm_rel_invar_chooser_equiv
    HonestMemory.PartyMemory.trans_virt_addr :
    ={addr} /\ addr{1} = cell_hon_virt_addr /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){2} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont].
 proof.
 conseq
   (_ :
    ={addr} /\ addr{1} = cell_hon_virt_addr /\
    gm_invar (glob Memory){1} /\ gm_invar (glob Memory){1} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont ==>
    ={res} /\
-   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2} 
+   gm_rel_invar_chooser (glob Memory){1} (glob Memory){2}
    cell_hon_virt_addr cell_phys_addr key cont)
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
@@ -4329,7 +4329,7 @@ module ExtraHonestMemorySim : EXTRA_HONEST_MEMORY_SIM = {
       end;
     }
   }
-  
+
   proc read_cell(cell_addr : addr) : bool option = {
     var r : bool option;  var phys_addr, virt_addr : addr;
     var obj_cell; var cell : cell;
@@ -4686,7 +4686,7 @@ module Simulator (Malicious : PARTY) : SIMULATOR = {
     end;
     Memory.init();  (* H and M can't use memory *)
   }
-  
+
   proc honest_start  = H.start
   proc honest_choice = H.choice
   proc honest_guess  = H.guess
@@ -4980,7 +4980,7 @@ inductive rel_invar
       (ri_chooser_wait_choice_from_adv hps ips shps mem1 mem2)
   | RI_Chooser_WaitCellAddrToOther
     (choice : bool, key_addr cell_addr cell_phys_addr : addr,
-     key : key) of 
+     key : key) of
       (ri_chooser_wait_cell_addr_to_other hps ips shps mem1 mem2
        choice key_addr cell_addr cell_phys_addr key)
   | RI_Chooser_WaitGuessFromOther
@@ -4997,7 +4997,7 @@ inductive rel_invar
   | RI_Chooser_Final_GMRelInvarChooser
     (choice : bool, key_addr cell_addr cell_phys_addr : addr,
      key : key) of
-      (ri_chooser_final_gm_rel_invar_chooser 
+      (ri_chooser_final_gm_rel_invar_chooser
        hps ips shps mem1 mem2
        choice key_addr cell_addr cell_phys_addr key)
   | RI_Chooser_WaitKeyAddrToOther
@@ -5045,18 +5045,22 @@ lemma from_adv :
    IdealProtocol(Simulator(Malicious)).from_adv :
    ={party, msg, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2} ==>
    ={res, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2}].
 proof.
 proc.
-case
-  (ri_chooser_wait_choice_from_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+exlim Honest.Honest.state{1}, IdealProtocol.state{2},
+      Simulator.H.state{2}, (glob Memory){1}, (glob Memory){2} =>
+  hon_state ip_state sim_state mem1 mem2.
+(* the "!!" is a hack to make the ambient case be a boolean one *)
+case @[ambient] (!! rel_invar hon_state ip_state sim_state mem1 mem2) =>
+  [/= [] | ?]; last exfalso; smt().
+(* ri_chooser_wait_choice_from_adv *)
+move => invar_ri_chooser_wait_choice_from_adv.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5096,7 +5100,7 @@ seq 1 1 :
    Memory.malicious_virt_map{1} = gm_to_malicious_virt_map gm /\
    (forall (mal_virt_addr : addr),
     mal_virt_addr \in gm_to_malicious_virt_map gm =>
-    let phys_addr' = 
+    let phys_addr' =
       oget (gm_to_malicious_virt_map gm).[mal_virt_addr] in
     oget Memory.phys_map{1}.[phys_addr'] <> Key (gm_to_next_key gm))).
 call{1} (HonestMemory.party_memory_create_key_phl gm).
@@ -5118,13 +5122,9 @@ wp.
   auto; smt(RI_Chooser_WaitChoiceFromAdv).
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; smt(RI_Chooser_WaitChoiceFromAdv).
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_cell_addr_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_wait_cell_addr_to_other *)
+move => choice key_addr cell_addr cell_phys_addr key
+        invar_ri_chooser_wait_cell_addr_to_other.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5151,13 +5151,10 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_WaitCellAddrToOther _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_guess_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_wait_guess_from_other *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_wait_guess_from_other.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5182,13 +5179,10 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_WaitGuessFromOther _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_error_to_adv_gm_rel_invar_chooser Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_wait_error_to_adv_gm_rel_invar_chooser *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_wait_error_to_adv_gm_rel_invar_chooser.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5213,13 +5207,10 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_WaitErrorToAdv_GMRelInvarChooser _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_final_gm_rel_invar_chooser Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_final_gm_rel_invar_chooser *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_final_gm_rel_invar_chooser.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5244,12 +5235,8 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_Final_GMRelInvarChooser _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr guess,
-   ri_chooser_wait_key_addr_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr guess).
-elim* => choice' key_addr' guess'.
+(* ri_chooser_wait_key_addr_to_other *)
+move => choice key_addr guess invar_ri_chooser_wait_key_addr_to_other.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5257,7 +5244,7 @@ conseq
    ri_chooser_wait_key_addr_to_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
-   choice' key_addr' guess' ==>
+   choice key_addr guess ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.from_adv.
@@ -5266,39 +5253,33 @@ match IPS_Chooser_WaitSimOK {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
-   choice' key_addr' guess') /#.
+   choice key_addr guess) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
-   choice' key_addr' guess') /#.
-case
-  (exists (result: bool),
-   ri_chooser_wait_result_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result).
-elim* => result'.
+   choice key_addr guess) /#.
+(* ri_chooser_wait_result_to_adv *)
+move => result invar_ri_chooser_wait_result_to_adv.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
    ri_chooser_wait_result_to_adv Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result' ==>
+   (glob Memory){1} (glob Memory){2} result ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.from_adv.
 match HPS_Chooser_WaitToAdvResult {1} 3; first auto; smt().
 match IPS_Chooser_WaitToAdvResult {2} 2; first auto; smt().
 auto; progress [-delta].
-rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
+rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
-rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
-case
-  (ri_chooser_wait_error_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result) /#.
+(* ri_chooser_wait_error_to_adv *)
+move => invar_ri_chooser_wait_error_to_adv.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5316,10 +5297,8 @@ rewrite RI_Chooser_WaitErrorToAdv /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Chooser_WaitErrorToAdv /#.
-case
-  (ri_chooser_final Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_chooser_final *)
+move => invar_ri_chooser_final.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5337,10 +5316,8 @@ rewrite RI_Chooser_Final /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Chooser_Final /#.
-case
-  (ri_guesser_wait_guess_from_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}) => /=.
+(* ri_guesser_wait_guess_from_adv *)
+move => invar_ri_guesser_wait_guess_from_adv.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5370,19 +5347,15 @@ rewrite (RI_Guesser_WaitGuessFromAdv _ _ _ _ _) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Guesser_WaitGuessFromAdv _ _ _ _ _) /#.
-case
-  (exists (guess : bool),
-   ri_guesser_wait_cell_addr_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} guess).
-elim* => guess'.
+(* ri_guesser_wait_cell_addr_from_other *)
+move => guess invar_ri_guesser_wait_cell_addr_from_other.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
    ri_guesser_wait_cell_addr_from_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} guess' ==>
+   (glob Memory){1} (glob Memory){2} guess ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.from_adv.
@@ -5390,18 +5363,14 @@ sp.
 match HPS_Guesser_WaitFromOtherCellAddr {1} 1; first auto; smt().
 match IPS_Guesser_WaitSimChoice {2} 1; first auto; smt().
 auto; progress [-delta].
-rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
+rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
-rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
-case
-  (exists (guess : bool, cell_addr : addr, cell_phys_addr : addr,
-           cont : bool, result : bool),
-   ri_guesser_wait_guess_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}
-   guess cell_addr cell_phys_addr cont result).
-elim* => guess' cell_addr' cell_phys_addr' cont' result'.
+rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess) /#.
+(* ri_guesser_wait_guess_to_other *)
+move =>
+  guess cell_addr cell_phys_addr cont result
+  invar_ri_guesser_wait_guess_to_other.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5409,7 +5378,7 @@ conseq
    ri_guesser_wait_guess_to_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
-   guess' cell_addr' cell_phys_addr' cont' result' ==>
+   guess cell_addr cell_phys_addr cont result ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.from_adv.
@@ -5419,22 +5388,18 @@ match IPS_Guesser_WaitSimOK {2} 1; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
-   guess' cell_addr' cell_phys_addr' cont' result') /#.
+   guess cell_addr cell_phys_addr cont result) /#.
 call
   (malicious_party_gm_invar_guesser_from_adv
-   cell_addr' cell_phys_addr' cont' Malicious).
+   cell_addr cell_phys_addr cont Malicious).
 auto; progress [-delta]; first 9 smt().
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
-   guess' cell_addr' cell_phys_addr' cont' result') /#.
-case
-  (exists (guess : bool, cell_addr : addr, cell_phys_addr : addr,
-           cont : bool, result : bool),
-   ri_guesser_wait_key_addr_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}
-   guess cell_addr cell_phys_addr cont result).
-elim* => guess' cell_addr' cell_phys_addr' cont' result'.
+   guess cell_addr cell_phys_addr cont result) /#.
+(* ri_guesser_wait_key_addr_from_other *)
+move =>
+  guess cell_addr cell_phys_addr cont result
+  invar_ri_guesser_wait_key_addr_from_other.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5442,7 +5407,7 @@ conseq
    ri_guesser_wait_key_addr_from_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
-   guess' cell_addr' cell_phys_addr' cont' result' ==>
+   guess cell_addr cell_phys_addr cont result ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.from_adv.
@@ -5452,27 +5417,23 @@ match IPS_Guesser_WaitSimOK {2} 1; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
-   guess' cell_addr' cell_phys_addr' cont' result') /#.
+   guess cell_addr cell_phys_addr cont result) /#.
 call
   (malicious_party_gm_invar_guesser_from_adv
-   cell_addr' cell_phys_addr' cont' Malicious).
+   cell_addr cell_phys_addr cont Malicious).
 auto; progress [-delta]; first 9 smt().
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
-   guess' cell_addr' cell_phys_addr' cont' result') /#.
-case
-  (exists (result : bool),
-   ri_guesser_wait_result_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result).
-elim* => result'.
+   guess cell_addr cell_phys_addr cont result) /#.
+(* ri_guesser_wait_result_to_adv *)
+move => result invar_ri_guesser_wait_result_to_adv.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
    ri_guesser_wait_result_to_adv Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result' ==>
+   (glob Memory){1} (glob Memory){2} result ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.from_adv.
@@ -5480,14 +5441,12 @@ sp.
 match HPS_Guesser_WaitToAdvResult {1} 1; first auto; smt().
 match IPS_Guesser_WaitToAdvResult {2} 1; first auto; smt().
 auto; progress [-delta].
-rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
+rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
-rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
-case
-  (ri_guesser_wait_error_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result) /#.
+(* ri_guesser_wait_error_to_adv *)
+move => invar_ri_guesser_wait_error_to_adv.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5506,10 +5465,8 @@ rewrite (RI_Guesser_WaitErrorToAdv _ _ _ _ _) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Guesser_WaitErrorToAdv _ _ _ _ _) /#.
-case
-  (ri_guesser_final Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_guesser_final *)
+move => invar_ri_guesser_final.
 conseq
   (_ :
    ={party, msg, glob Malicious} /\
@@ -5528,7 +5485,6 @@ rewrite (RI_Guesser_Final _ _ _ _ _) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Guesser_Final _ _ _ _ _) /#.
-exfalso => &1 &2 [#] _ _ _ _ _ [] /#.
 qed.
 
 lemma to_adv :
@@ -5537,18 +5493,22 @@ lemma to_adv :
    IdealProtocol(Simulator(Malicious)).to_adv :
    ={party, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2} ==>
    ={res, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2}].
 proof.
 proc.
-case
-  (ri_chooser_wait_choice_from_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+exlim Honest.Honest.state{1}, IdealProtocol.state{2},
+      Simulator.H.state{2}, (glob Memory){1}, (glob Memory){2} =>
+  hon_state ip_state sim_state mem1 mem2.
+(* the "!!" is a hack to make the ambient case be a boolean one *)
+case @[ambient] (!! rel_invar hon_state ip_state sim_state mem1 mem2) =>
+  [/= [] | ?]; last exfalso; smt().
+(* ri_chooser_wait_choice_from_adv *)
+move => invar_ri_chooser_wait_choice_from_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5566,13 +5526,9 @@ rewrite RI_Chooser_WaitChoiceFromAdv /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Chooser_WaitChoiceFromAdv /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_cell_addr_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_wait_cell_addr_to_other *)
+move => choice key_addr cell_addr cell_phys_addr key
+        invar_ri_chooser_wait_cell_addr_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5598,13 +5554,10 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_WaitCellAddrToOther _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_guess_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_wait_guess_from_other *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_wait_guess_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5629,13 +5582,10 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_WaitGuessFromOther _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_error_to_adv_gm_rel_invar_chooser Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_wait_error_to_adv_gm_rel_invar_chooser *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_wait_error_to_adv_gm_rel_invar_chooser.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5660,13 +5610,10 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_WaitErrorToAdv_GMRelInvarChooser _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_final_gm_rel_invar_chooser Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_final_gm_rel_invar_chooser *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_final_gm_rel_invar_chooser.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5691,12 +5638,8 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_Final_GMRelInvarChooser _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr guess,
-   ri_chooser_wait_key_addr_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr guess).
-elim* => choice' key_addr' guess'.
+(* ri_chooser_wait_key_addr_to_other *)
+move => choice key_addr guess invar_ri_chooser_wait_key_addr_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5704,7 +5647,7 @@ conseq
    ri_chooser_wait_key_addr_to_other
    Honest.Honest.state{1} IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
-   choice' key_addr' guess' ==>
+   choice key_addr guess ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_adv.
@@ -5713,25 +5656,21 @@ match IPS_Chooser_WaitSimOK {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
-   choice' key_addr' guess') /#.
+   choice key_addr guess) /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
-   choice' key_addr' guess') /#.
-case
-  (exists (result: bool),
-   ri_chooser_wait_result_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result).
-elim* => result'.
+   choice key_addr guess) /#.
+(* ri_chooser_wait_result_to_adv *)
+move => result invar_ri_chooser_wait_result_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
    ri_chooser_wait_result_to_adv
    Honest.Honest.state{1} IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result' ==>
+   (glob Memory){1} (glob Memory){2} result ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_adv.
@@ -5741,12 +5680,9 @@ auto; progress [-delta]; first smt().
 rewrite RI_Chooser_Final /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
-rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
-case
-  (ri_chooser_wait_error_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
-match => //.
+rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result) /#.
+(* ri_chooser_wait_error_to_adv *)
+move => invar_ri_chooser_wait_error_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5755,6 +5691,7 @@ conseq
    Honest.Honest.state{1} IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} ==>
    _) => //.
+match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_adv.
 match HPS_Chooser_WaitToAdvError {1} 2; first auto; smt().
 match IPS_Chooser_WaitToAdvError {2} 2; first auto; smt().
@@ -5763,10 +5700,8 @@ rewrite RI_Chooser_Final /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Chooser_WaitErrorToAdv _ _ _ _ _) /#.
-case
-  (ri_chooser_final Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_chooser_final *)
+move => invar_ri_chooser_final.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5784,10 +5719,8 @@ by rewrite RI_Chooser_Final.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Chooser_Final /#.
-case
-  (ri_guesser_wait_guess_from_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}) => /=.
+(* ri_guesser_wait_guess_from_adv *)
+move => invar_ri_guesser_wait_guess_from_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5805,37 +5738,29 @@ rewrite RI_Guesser_WaitGuessFromAdv /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Guesser_WaitGuessFromAdv /#.
-case
-  (exists (guess : bool),
-   ri_guesser_wait_cell_addr_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} guess).
-elim* => guess'.
+(* ri_guesser_wait_cell_addr_from_other *)
+move => guess invar_ri_guesser_wait_cell_addr_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
    ri_guesser_wait_cell_addr_from_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} guess' ==>
+   (glob Memory){1} (glob Memory){2} guess ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_adv.
 match HPS_Guesser_WaitFromOtherCellAddr {1} 2; first auto; smt().
 match IPS_Guesser_WaitSimChoice {2} 2; first auto; smt().
 auto; progress [-delta].
-rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
+rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess) /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
-rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
-case
-  (exists (guess : bool, cell_addr : addr, cell_phys_addr : addr,
-           cont : bool, result : bool),
-   ri_guesser_wait_guess_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}
-   guess cell_addr cell_phys_addr cont result).
-elim* => guess' cell_addr' cell_phys_addr' cont' result'.
+rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess) /#.
+(* ri_guesser_wait_guess_to_other *)
+move =>
+  guess cell_addr cell_phys_addr cont result
+  invar_ri_guesser_wait_guess_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5843,7 +5768,7 @@ conseq
    ri_guesser_wait_guess_to_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
-   guess' cell_addr' cell_phys_addr' cont' result' ==>
+   guess cell_addr cell_phys_addr cont result ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_adv.
@@ -5852,22 +5777,18 @@ match IPS_Guesser_WaitSimOK {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
-   guess' cell_addr' cell_phys_addr' cont' result') /#.
+   guess cell_addr cell_phys_addr cont result) /#.
 call
   (malicious_party_gm_invar_guesser_to_adv
-   cell_addr' cell_phys_addr' cont' Malicious).
+   cell_addr cell_phys_addr cont Malicious).
 auto; progress [-delta]; first 9 smt().
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
-   guess' cell_addr' cell_phys_addr' cont' result') /#.
-case
-  (exists (guess : bool, cell_addr : addr, cell_phys_addr : addr,
-           cont : bool, result : bool),
-   ri_guesser_wait_key_addr_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}
-   guess cell_addr cell_phys_addr cont result).
-elim* => guess' cell_addr' cell_phys_addr' cont' result'.
+   guess cell_addr cell_phys_addr cont result) /#.
+(* ri_guesser_wait_key_addr_from_other *)
+move =>
+  guess cell_addr cell_phys_addr cont result
+  invar_ri_guesser_wait_key_addr_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5875,7 +5796,7 @@ conseq
    ri_guesser_wait_key_addr_from_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
-   guess' cell_addr' cell_phys_addr' cont' result' ==>
+   guess cell_addr cell_phys_addr cont result ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_adv.
@@ -5884,27 +5805,23 @@ match IPS_Guesser_WaitSimOK {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
-   guess' cell_addr' cell_phys_addr' cont' result') /#.
+   guess cell_addr cell_phys_addr cont result) /#.
 call
   (malicious_party_gm_invar_guesser_to_adv
-   cell_addr' cell_phys_addr' cont' Malicious).
+   cell_addr cell_phys_addr cont Malicious).
 auto; progress [-delta]; first 9 smt().
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
-   guess' cell_addr' cell_phys_addr' cont' result') /#.
-case
-  (exists (result : bool),
-   ri_guesser_wait_result_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result).
-elim* => result'.
+   guess cell_addr cell_phys_addr cont result) /#.
+(* ri_guesser_wait_result_to_adv *)
+move => result invar_ri_guesser_wait_result_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
    ri_guesser_wait_result_to_adv Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result' ==>
+   (glob Memory){1} (glob Memory){2} result ==>
    _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_adv.
@@ -5914,11 +5831,9 @@ auto; progress [-delta]; first smt().
 rewrite RI_Guesser_Final /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
-rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
-case
-  (ri_guesser_wait_error_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result) /#.
+(* ri_guesser_wait_error_to_adv *)
+move => invar_ri_guesser_wait_error_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5936,10 +5851,8 @@ rewrite (RI_Guesser_Final _ _ _ _ _) /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Guesser_WaitErrorToAdv /#.
-case
-  (ri_guesser_final Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_guesser_final *)
+move => invar_ri_guesser_final.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -5957,7 +5870,6 @@ rewrite RI_Guesser_Final /#.
 call (malicious_party_gm_invar_to_adv Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Guesser_Final /#.
-exfalso => &1 &2 [#] _ _ _ _ [] /#.
 qed.
 
 lemma queue :
@@ -5966,18 +5878,22 @@ lemma queue :
    IdealProtocol(Simulator(Malicious)).queue :
    ={party, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2} ==>
    ={glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2}].
 proof.
 proc.
-case
-  (ri_chooser_wait_choice_from_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+exlim Honest.Honest.state{1}, IdealProtocol.state{2},
+      Simulator.H.state{2}, (glob Memory){1}, (glob Memory){2} =>
+  hon_state ip_state sim_state mem1 mem2.
+(* the "!!" is a hack to make the ambient case be a boolean one *)
+case @[ambient] (!! rel_invar hon_state ip_state sim_state mem1 mem2) =>
+  [/= [] | ?]; last exfalso; smt().
+(* ri_chooser_wait_choice_from_adv *)
+move => invar_ri_chooser_wait_choice_from_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6002,13 +5918,9 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Chooser_WaitChoiceFromAdv /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_cell_addr_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice' key_addr' cell_addr' cell_phys_addr' key'.
+(* ri_chooser_wait_cell_addr_to_other *)
+move => choice' key_addr' cell_addr' cell_phys_addr' key'
+        invar_ri_chooser_wait_cell_addr_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6052,13 +5964,10 @@ auto; progress [-delta]; first 3 auto; smt().
 rewrite
   (RI_Chooser_WaitCellAddrToOther _ _ _ _ _
    choice' key_addr' cell_addr' cell_phys_addr' key') /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_guess_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_wait_guess_from_other *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_wait_guess_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6087,13 +5996,10 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_WaitGuessFromOther _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_error_to_adv_gm_rel_invar_chooser Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_wait_error_to_adv_gm_rel_invar_chooser *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_wait_error_to_adv_gm_rel_invar_chooser.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6122,13 +6028,10 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_WaitErrorToAdv_GMRelInvarChooser _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_final_gm_rel_invar_chooser Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice key_addr cell_addr cell_phys_addr key.
+(* ri_chooser_final_gm_rel_invar_chooser *)
+move =>
+  choice key_addr cell_addr cell_phys_addr key
+  invar_ri_chooser_final_gm_rel_invar_chooser.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6157,12 +6060,8 @@ auto; progress [-delta]; first 3 smt().
 rewrite
   (RI_Chooser_Final_GMRelInvarChooser _ _ _ _ _
    choice key_addr cell_addr cell_phys_addr key) /#.
-case
-  (exists choice key_addr guess,
-   ri_chooser_wait_key_addr_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr guess).
-elim* => choice' key_addr' guess'.
+(* ri_chooser_wait_key_addr_to_other *)
+move => choice' key_addr' guess' invar_ri_chooser_wait_key_addr_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6201,12 +6100,8 @@ auto; progress [-delta]; first 8 smt().
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
    choice' key_addr' guess') /#.
-case
-  (exists (result: bool),
-   ri_chooser_wait_result_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result).
-elim* => result'.
+(* ri_chooser_wait_result_to_adv *)
+move => result' invar_ri_chooser_wait_result_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6228,10 +6123,8 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
-case
-  (ri_chooser_wait_error_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_chooser_wait_error_to_adv *)
+move => invar_ri_chooser_wait_error_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6253,10 +6146,8 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Chooser_WaitErrorToAdv _ _ _ _ _) /#.
-case
-  (ri_chooser_final Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_chooser_final *)
+move => invar_ri_chooser_final.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6279,10 +6170,8 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Chooser_Final /#.
-case
-  (ri_guesser_wait_guess_from_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}) => /=.
+(* ri_guesser_wait_guess_from_adv *)
+move => invar_ri_guesser_wait_guess_from_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6290,7 +6179,7 @@ conseq
    ri_guesser_wait_guess_from_adv Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).honest_queue
@@ -6305,12 +6194,8 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Guesser_WaitGuessFromAdv /#.
-case
-  (exists (guess : bool),
-   ri_guesser_wait_cell_addr_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} guess).
-elim* => guess'.
+(* ri_guesser_wait_cell_addr_from_other *)
+move => guess' invar_ri_guesser_wait_cell_addr_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6318,7 +6203,7 @@ conseq
    ri_guesser_wait_cell_addr_from_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} guess' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).honest_queue
@@ -6333,14 +6218,10 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
-case
-  (exists (guess : bool, cell_addr : addr, cell_phys_addr : addr,
-           cont : bool, result : bool),
-   ri_guesser_wait_guess_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}
-   guess cell_addr cell_phys_addr cont result).
-elim* => guess' cell_addr' cell_phys_addr' cont' result'.
+(* ri_guesser_wait_guess_to_other *)
+move =>
+  guess' cell_addr' cell_phys_addr' cont' result'
+  invar_ri_guesser_wait_guess_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6349,7 +6230,7 @@ conseq
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
    guess' cell_addr' cell_phys_addr' cont' result' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).honest_queue
@@ -6370,14 +6251,10 @@ auto; progress [-delta]; first 9 smt().
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
    guess' cell_addr' cell_phys_addr' cont' result') /#.
-case
-  (exists (guess : bool, cell_addr : addr, cell_phys_addr : addr,
-           cont : bool, result : bool),
-   ri_guesser_wait_key_addr_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}
-   guess cell_addr cell_phys_addr cont result).
-elim* => guess' cell_addr' cell_phys_addr' cont' result'.
+(* ri_guesser_wait_key_addr_from_other *)
+move =>
+  guess' cell_addr' cell_phys_addr' cont' result'
+  invar_ri_guesser_wait_key_addr_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6386,7 +6263,7 @@ conseq
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
    guess' cell_addr' cell_phys_addr' cont' result' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).honest_queue
@@ -6407,12 +6284,8 @@ auto; progress [-delta]; first 9 smt().
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
    guess' cell_addr' cell_phys_addr' cont' result') /#.
-case
-  (exists (result : bool),
-   ri_guesser_wait_result_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result).
-elim* => result'.
+(* ri_guesser_wait_result_to_adv *)
+move => result' invar_ri_guesser_wait_result_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6420,7 +6293,7 @@ conseq
    ri_guesser_wait_result_to_adv Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} result' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).honest_queue
@@ -6435,10 +6308,8 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
-case
-  (ri_guesser_wait_error_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_guesser_wait_error_to_adv *)
+move => invar_ri_guesser_wait_error_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6446,7 +6317,7 @@ conseq
    ri_guesser_wait_error_to_adv Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).honest_queue
@@ -6461,10 +6332,8 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Guesser_WaitErrorToAdv /#.
-case
-  (ri_guesser_final Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_guesser_final *)
+move => invar_ri_guesser_final.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6472,7 +6341,7 @@ conseq
    ri_guesser_final Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).honest_queue
@@ -6487,7 +6356,6 @@ wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite RI_Guesser_Final /#.
-exfalso => &1 &2 [#] _ _ _ _ [] /#.
 qed.
 
 lemma deliver :
@@ -6496,18 +6364,22 @@ lemma deliver :
    IdealProtocol(Simulator(Malicious)).deliver :
    ={party, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2} ==>
    ={glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2}].
 proof.
 proc.
-case
-  (ri_chooser_wait_choice_from_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+exlim Honest.Honest.state{1}, IdealProtocol.state{2},
+      Simulator.H.state{2}, (glob Memory){1}, (glob Memory){2} =>
+  hon_state ip_state sim_state mem1 mem2.
+(* the "!!" is a hack to make the ambient case be a boolean one *)
+case @[ambient] (!! rel_invar hon_state ip_state sim_state mem1 mem2) =>
+  [/= [] | ?]; last exfalso; smt().
+(* ri_chooser_wait_choice_from_adv *)
+move => invar_ri_chooser_wait_choice_from_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6515,7 +6387,7 @@ conseq
    ri_chooser_wait_choice_from_adv Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver.
 sp.
@@ -6542,13 +6414,9 @@ wp.
 call (malicious_party_gm_invar_from_other Malicious).
 (auto; progress [-delta]; first 8 smt());
   rewrite RI_Chooser_WaitChoiceFromAdv /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_cell_addr_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice' key_addr' cell_addr' cell_phys_addr' key'.
+(* ri_chooser_wait_cell_addr_to_other *)
+move => choice' key_addr' cell_addr' cell_phys_addr' key'
+        invar_ri_chooser_wait_cell_addr_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6557,7 +6425,7 @@ conseq
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
    choice' key_addr' cell_addr' cell_phys_addr' key' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver.
 sp.
@@ -6596,13 +6464,10 @@ call
   rewrite
     (RI_Chooser_WaitCellAddrToOther _ _ _ _ _
      choice' key_addr' cell_addr' cell_phys_addr' key') /#.
-case
-  (exists choice' key_addr' cell_addr' cell_phys_addr' key',
-   ri_chooser_wait_guess_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice' key_addr' cell_addr'
-   cell_phys_addr' key').
-elim* => choice' key_addr' cell_addr' cell_phys_addr' key'.
+(* ri_chooser_wait_guess_from_other *)
+move =>
+  choice' key_addr' cell_addr' cell_phys_addr' key'
+  invar_ri_chooser_wait_guess_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6611,7 +6476,7 @@ conseq
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
    choice' key_addr' cell_addr' cell_phys_addr' key' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -6674,13 +6539,10 @@ call
   rewrite
     (RI_Chooser_WaitGuessFromOther _ _ _ _ _
      choice' key_addr' cell_addr' cell_phys_addr' key') /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_wait_error_to_adv_gm_rel_invar_chooser Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice' key_addr' cell_addr' cell_phys_addr' key'.
+(* ri_chooser_wait_error_to_adv_gm_rel_invar_chooser *)
+move =>
+  choice' key_addr' cell_addr' cell_phys_addr' key'
+  invar_ri_chooser_wait_error_to_adv_gm_rel_invar_chooser.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6689,7 +6551,7 @@ conseq
    Honest.Honest.state{1} IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
    choice' key_addr' cell_addr' cell_phys_addr' key' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -6725,13 +6587,10 @@ call
   rewrite
     (RI_Chooser_WaitErrorToAdv_GMRelInvarChooser _ _ _ _ _
      choice' key_addr' cell_addr' cell_phys_addr' key') /#.
-case
-  (exists choice key_addr cell_addr cell_phys_addr key,
-   ri_chooser_final_gm_rel_invar_chooser Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr cell_addr
-   cell_phys_addr key).
-elim* => choice' key_addr' cell_addr' cell_phys_addr' key'.
+(* ri_chooser_final_gm_rel_invar_chooser *)
+move =>
+  choice' key_addr' cell_addr' cell_phys_addr' key'
+  invar_ri_chooser_final_gm_rel_invar_chooser.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6740,7 +6599,7 @@ conseq
    Honest.Honest.state{1} IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
    choice' key_addr' cell_addr' cell_phys_addr' key' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -6776,12 +6635,8 @@ call
   rewrite
     (RI_Chooser_Final_GMRelInvarChooser _ _ _ _ _
      choice' key_addr' cell_addr' cell_phys_addr' key') /#.
-case
-  (exists choice key_addr guess,
-   ri_chooser_wait_key_addr_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} choice key_addr guess).
-elim* => choice' key_addr' guess'.
+(* ri_chooser_wait_key_addr_to_other *)
+move => choice' key_addr' guess' invar_ri_chooser_wait_key_addr_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6790,7 +6645,7 @@ conseq
    Honest.Honest.state{1} IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
    choice' key_addr' guess' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -6824,12 +6679,8 @@ call (malicious_party_gm_invar_from_other Malicious).
   rewrite
     (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
      choice' key_addr' guess') /#.
-case
-  (exists (result: bool),
-   ri_chooser_wait_result_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result).
-elim* => result'.
+(* ri_chooser_wait_result_to_adv *)
+move => result' invar_ri_chooser_wait_result_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6837,7 +6688,7 @@ conseq
    ri_chooser_wait_result_to_adv
    Honest.Honest.state{1} IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} result' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -6864,10 +6715,8 @@ call (malicious_party_gm_invar_from_other Malicious).
 auto; progress [-delta]; first 8 auto; smt().
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
-case
-  (ri_chooser_wait_error_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_chooser_wait_error_to_adv *)
+move => invar_ri_chooser_wait_error_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6875,7 +6724,7 @@ conseq
    ri_chooser_wait_error_to_adv
    Honest.Honest.state{1} IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -6902,10 +6751,8 @@ call (malicious_party_gm_invar_from_other Malicious).
 auto; progress [-delta]; first 8 smt().
 rewrite (RI_Chooser_WaitErrorToAdv _ _ _ _ _) /#.
 rewrite (RI_Chooser_WaitErrorToAdv _ _ _ _ _) /#.
-case
-  (ri_chooser_final Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_chooser_final *)
+move => invar_ri_chooser_final.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6913,7 +6760,7 @@ conseq
    ri_chooser_final Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -6939,10 +6786,8 @@ wp.
 call (malicious_party_gm_invar_from_other Malicious).
 (auto; progress [-delta]; first 8 smt());
   rewrite (RI_Chooser_Final _ _ _ _ _) /#.
-case
-  (ri_guesser_wait_guess_from_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}) => /=.
+(* ri_guesser_wait_guess_from_adv *)
+move => invar_ri_guesser_wait_guess_from_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6950,7 +6795,7 @@ conseq
    ri_guesser_wait_guess_from_adv Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -6976,12 +6821,8 @@ wp.
 call (malicious_party_gm_invar_from_other Malicious).
 (auto; progress [-delta]; first 8 smt());
   rewrite (RI_Guesser_WaitGuessFromAdv _ _ _ _ _) /#.
-case
-  (exists (guess : bool),
-   ri_guesser_wait_cell_addr_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} guess).
-elim* => guess'.
+(* ri_guesser_wait_cell_addr_from_other *)
+move => guess' invar_ri_guesser_wait_cell_addr_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -6989,7 +6830,7 @@ conseq
    ri_guesser_wait_cell_addr_from_other Honest.Honest.state{1}
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2} guess' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -7033,7 +6874,7 @@ match SHPS_Guesser_WaitFromIPGuess {2} 8; first auto; smt().
 auto; progress [-delta].
 pose cell := cell_addr_to_cell Honest (glob Memory){1} cell_addr{2}.
 rewrite
-  (RI_Guesser_WaitGuessToOther _ _ _ _ _ 
+  (RI_Guesser_WaitGuessToOther _ _ _ _ _
    guess{1} cell_addr{2} (oget Memory.honest_virt_map{1}.[cell_addr{2}])
    cell.`cont (guess{2} = cell.`cont)); smt(get_some).
 seq 1 1 : (#pre /\ ! b0{1} /\ choice_opt{2} = None).
@@ -7066,14 +6907,10 @@ wp.
 call (malicious_party_gm_invar_from_other Malicious).
 (auto; progress [-delta]; first 8 smt());
   rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
-case
-  (exists (guess : bool, cell_addr : addr, cell_phys_addr : addr,
-           cont : bool, result : bool),
-   ri_guesser_wait_guess_to_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}
-   guess cell_addr cell_phys_addr cont result).
-elim* => guess' cell_addr' cell_phys_addr' cont' result'.
+(* ri_guesser_wait_guess_to_other *)
+move =>
+  guess' cell_addr' cell_phys_addr' cont' result'
+  invar_ri_guesser_wait_guess_to_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -7082,7 +6919,7 @@ conseq
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
     guess' cell_addr' cell_phys_addr' cont' result' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -7118,14 +6955,10 @@ call
   rewrite
     (RI_Guesser_WaitGuessToOther _ _ _ _ _
      guess' cell_addr' cell_phys_addr' cont' result') /#.
-case
-  (exists (guess : bool, cell_addr : addr, cell_phys_addr : addr,
-           cont : bool, result : bool),
-   ri_guesser_wait_key_addr_from_other Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}
-   guess cell_addr cell_phys_addr cont result).
-elim* => guess' cell_addr' cell_phys_addr' cont' result'.
+(* ri_guesser_wait_key_addr_from_other *)
+move =>
+  guess' cell_addr' cell_phys_addr' cont' result'
+  invar_ri_guesser_wait_key_addr_from_other.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -7134,7 +6967,7 @@ conseq
    IdealProtocol.state{2} Simulator.H.state{2}
    (glob Memory){1} (glob Memory){2}
     guess' cell_addr' cell_phys_addr' cont' result' ==>
-   _) => //. 
+   _) => //.
 match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
@@ -7223,12 +7056,8 @@ call
   rewrite
     (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
      guess' cell_addr' cell_phys_addr' cont' result') /#.
-case
-  (exists (result : bool),
-   ri_guesser_wait_result_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2} result).
-elim* => result'.
+(* ri_guesser_wait_result_to_adv *)
+move => result' invar_ri_guesser_wait_result_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -7260,10 +7089,8 @@ wp.
 call (malicious_party_gm_invar_from_other Malicious).
 (auto; progress [-delta]; first 8 smt());
   rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
-case
-  (ri_guesser_wait_error_to_adv Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_guesser_wait_error_to_adv *)
+move => invar_ri_guesser_wait_error_to_adv.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -7295,10 +7122,8 @@ wp.
 call (malicious_party_gm_invar_from_other Malicious).
 (auto; progress [-delta]; first 8 smt());
   rewrite (RI_Guesser_WaitErrorToAdv _ _ _ _ _) /#.
-case
-  (ri_guesser_final Honest.Honest.state{1}
-   IdealProtocol.state{2} Simulator.H.state{2}
-   (glob Memory){1} (glob Memory){2}).
+(* ri_guesser_final *)
+move => invar_ri_guesser_final.
 conseq
   (_ :
    ={party, glob Malicious} /\
@@ -7330,7 +7155,6 @@ wp.
 call (malicious_party_gm_invar_from_other Malicious).
 (auto; progress [-delta]; first 8 smt());
   rewrite (RI_Guesser_Final _ _ _ _ _) /#.
-exfalso => &1 &2 [#] _ _ _ _ [] /#.
 qed.
 
 lemma Sec
@@ -7349,7 +7173,7 @@ seq 1 1 : (={glob Adv, glob Malicious, chooser});
 seq 1 1 :
   (={glob Adv, glob Malicious} /\
    ={to_malicious_queue, to_honest_queue}(RealProtocol, Simulator) /\
-   rel_invar Honest.Honest.state{1} IdealProtocol.state{2} 
+   rel_invar Honest.Honest.state{1} IdealProtocol.state{2}
    Simulator.H.state{2} (glob Memory){1} (glob Memory){2}).
 inline RealProtocol(Honest.Honest, Malicious).init
        IdealProtocol(Simulator(Malicious)).init
