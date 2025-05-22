@@ -1,4 +1,5 @@
-(* Boolean Guessing Game Security, Expressed in a Real/ideal Style
+(* Boolean Guessing Game Security, Expressed in a Real/ideal
+   Simulation-based Style
 
    We have a two-party protocol, where each party is assigned to be
    either the chooser or guesser of a boolean. The guesser wins
@@ -6,9 +7,10 @@
    is incorrect.
 
    In the real protocol, the parties communicate via messages, and
-   also rely on trusted infrastructure, involving a physical memory
+   also rely on a trusted computing base, involving a physical memory
    storing immutable objects, where each party has a virtual memory
-   giving them access to certain physical addresses.
+   giving it indirect access to the objects at certain physical
+   addresses. We call this "security through indirection".
 
    As usual, the ideal protocol is secure by construction, and
    security means that an adversary is unable to distinguish
