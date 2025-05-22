@@ -155,20 +155,15 @@ module Memory : MEMORY = {
   var next_phys_addr : addr
   var phys_map : (addr, object) fmap
 
-  var honest_next_virt_addr : addr
-  var honest_virt_map    : (addr, addr) fmap
-
-  var malicious_next_virt_addr : addr
-  var malicious_virt_map : (addr, addr) fmap
+  var next_virt_addr : (party, addr) fmap
+  var virt_map : (party, (addr, addr) fmap) fmap
 
   proc init() : unit = {
-    next_key                 <- 0;
-    next_phys_addr           <- 0;
-    phys_map                 <- empty;
-    honest_next_virt_addr    <- 0;
-    honest_virt_map          <- empty;
-    malicious_next_virt_addr <- 0;
-    malicious_virt_map       <- empty;
+    next_key       <- 0;
+    next_phys_addr <- 0;
+    phys_map       <- empty;
+    next_virt_addr <- empty.[Honest <- 0].[Malicious <- 0];
+    virt_map       <- empty.[Honest <- empty].[Malicious <- empty];
   }
 
   proc phys_alloc(obj : object) : addr = {
@@ -179,41 +174,22 @@ module Memory : MEMORY = {
     return r;
   }
 
-  proc honest_virt_alloc(phys_addr : addr) : addr = {
-    var r : addr;
-    honest_virt_map.[honest_next_virt_addr] <- phys_addr;
-    r <- honest_next_virt_addr;
-    honest_next_virt_addr <- honest_next_virt_addr + 1;
-    return r;
-  }
-
-  proc malicious_virt_alloc(phys_addr : addr) : addr = {
-    var r : addr;
-    malicious_virt_map.[malicious_next_virt_addr] <- phys_addr;
-    r <- malicious_next_virt_addr;
-    malicious_next_virt_addr <- malicious_next_virt_addr + 1;
-    return r;
+  proc virt_alloc(pty : party, phys_addr : addr) : addr = {
+    var next : addr <- oget (next_virt_addr.[pty]);
+    virt_map.[pty] <- (oget virt_map.[pty]).[next <- phys_addr];
+    next_virt_addr.[pty] <- next + 1;
+    return next;
   }
 
   proc trans_virt_addr(pty : party, addr : addr) : addr option = {
     var r : addr option;
     var phys_addr, other_virt_addr : addr;
-    if (pty = Honest) {
-      if (addr \in honest_virt_map) {
-        phys_addr <- oget honest_virt_map.[addr];
-        other_virt_addr <@ malicious_virt_alloc(phys_addr);
-        r <- Some other_virt_addr;
-      }
-      else { r <- None; }
+    if (addr \in oget virt_map.[pty]) {
+      phys_addr <- oget (oget virt_map.[pty]).[addr];
+      other_virt_addr <@ virt_alloc(other pty, phys_addr);
+      r <- Some other_virt_addr;
     }
-    else {
-      if (addr \in malicious_virt_map) {
-        phys_addr <- oget malicious_virt_map.[addr];
-        other_virt_addr <@ honest_virt_alloc(phys_addr);
-        r <- Some other_virt_addr;
-      }
-      else { r <- None; }
-    }
+    else { r <- None; }
     return r;
   }
 
@@ -222,158 +198,83 @@ module Memory : MEMORY = {
     var phys_addr, virt_addr : addr;
     next_key <- next_key + 1;
     phys_addr <@ phys_alloc(Key key);
-    if (pty = Honest) {
-      virt_addr <@ honest_virt_alloc(phys_addr);
-    }
-    else {
-      virt_addr <@ malicious_virt_alloc(phys_addr);
-    }
+    virt_addr <@ virt_alloc(pty, phys_addr);
     return virt_addr;
   }
 
   proc is_key(pty : party, key_addr : addr) : bool = {
     var r : bool;
-    if (pty = Honest) {
-      if (key_addr \in honest_virt_map) {
-        r <- is_key (oget phys_map.[oget honest_virt_map.[key_addr]]);
-      }
-      else { r <- false; }
+    if (key_addr \in oget virt_map.[pty]) {
+      r <- is_key (oget phys_map.[oget (oget virt_map.[pty]).[key_addr]]);
     }
-    else {
-      if (key_addr \in malicious_virt_map) {
-        r <- is_key (oget phys_map.[oget malicious_virt_map.[key_addr]]);
-      }
-      else { r <- false; }
-    }
+    else { r <- false; }
     return r;
   }
 
   proc create_cell(pty : party, key_addr : addr, b : bool) : addr option = {
     var r : addr option;
     var phys_addr, virt_addr : addr;
-    if (pty = Honest) {
-      if (key_addr \in honest_virt_map) {
-        match oget phys_map.[oget honest_virt_map.[key_addr]] with
-        | Key key => {
-            phys_addr <@
-              phys_alloc(Cell {|key = key; cont = b; locked = true|});
-            virt_addr <@ honest_virt_alloc(phys_addr);
-            r <- Some virt_addr;
-          }
-        | Cell _  => { r <- None; }
-        end;
-      }
-      else { r <- None; }
+    if (key_addr \in oget virt_map.[pty]) {
+      match oget phys_map.[oget (oget virt_map.[pty]).[key_addr]] with
+      | Key key => {
+          phys_addr <@
+            phys_alloc(Cell {|key = key; cont = b; locked = true|});
+          virt_addr <@ virt_alloc(pty, phys_addr);
+          r <- Some virt_addr;
+        }
+      | Cell _  => { r <- None; }
+      end;
     }
-    else {
-      if (key_addr \in malicious_virt_map) {
-        match oget phys_map.[oget malicious_virt_map.[key_addr]] with
-        | Key key => {
-            phys_addr <@
-              phys_alloc(Cell {|key = key; cont = b; locked = true|});
-            virt_addr <@ malicious_virt_alloc(phys_addr);
-            r <- Some virt_addr;
-          }
-        | Cell _  => { r <- None; }
-        end;
-      }
-      else { r <- None; }
-    }
+    else { r <- None; }
     return r;
   }
 
   proc is_cell(pty : party, cell_addr : addr) : bool = {
     var r : bool;
-    if (pty = Honest) {
-      if (cell_addr \in honest_virt_map) {
-        r <- is_cell (oget phys_map.[oget honest_virt_map.[cell_addr]]);
-      }
-      else { r <- false; }
+    if (cell_addr \in oget virt_map.[pty]) {
+      r <- is_cell (oget phys_map.[oget (oget virt_map.[pty]).[cell_addr]]);
     }
-    else {
-      if (cell_addr \in malicious_virt_map) {
-        r <- is_cell (oget phys_map.[oget malicious_virt_map.[cell_addr]]);
-      }
-      else { r <- false; }
-    }
+    else { r <- false; }
     return r;
   }
 
   proc unlock_cell(pty : party, cell_addr : addr, key_addr : addr)
          : addr option = {
-    var r : addr option;
-    var phys_addr, virt_addr : addr;
-    var obj_cell, obj_key : object;
-    var cell : cell; var key : key;
-    if (pty = Honest) {
-      if (cell_addr \in honest_virt_map /\
-          key_addr  \in honest_virt_map) {
-        obj_cell <- oget phys_map.[oget honest_virt_map.[cell_addr]];
-        obj_key  <- oget phys_map.[oget honest_virt_map.[key_addr]];
-        if (is_cell obj_cell /\ is_key obj_key) {
-          cell <- oget (get_as_Cell obj_cell);
-          key  <- oget (get_as_Key obj_key);
-          if (cell.`key = key) {
-            cell <- {|cell with locked = false|};
-            phys_addr <@ phys_alloc(Cell cell);
-            virt_addr <@ honest_virt_alloc(phys_addr);
-            r <- Some virt_addr;
-          }
-          else { r <- None; }
+    var r : addr option; var phys_addr, virt_addr : addr;
+    var obj_cell, obj_key : object; var cell : cell; var key : key;
+    if (cell_addr \in oget virt_map.[pty] /\
+        key_addr  \in oget virt_map.[pty]) {
+      obj_cell <- oget phys_map.[oget (oget virt_map.[pty]).[cell_addr]];
+      obj_key  <- oget phys_map.[oget (oget virt_map.[pty]).[key_addr]];
+      if (is_cell obj_cell /\ is_key obj_key) {
+        cell <- oget (get_as_Cell obj_cell);
+        key  <- oget (get_as_Key obj_key);
+        if (cell.`key = key) {
+          cell <- {|cell with locked = false|};
+          phys_addr <@ phys_alloc(Cell cell);
+          virt_addr <@ virt_alloc(pty, phys_addr);
+          r <- Some virt_addr;
         }
         else { r <- None; }
       }
       else { r <- None; }
     }
-    else {
-      if (cell_addr \in malicious_virt_map /\
-          key_addr  \in malicious_virt_map) {
-        obj_cell <- oget phys_map.[oget malicious_virt_map.[cell_addr]];
-        obj_key  <- oget phys_map.[oget malicious_virt_map.[key_addr]];
-        if (is_cell obj_cell /\ is_key obj_key) {
-          cell <- oget (get_as_Cell obj_cell);
-          key  <- oget (get_as_Key obj_key);
-          if (cell.`key = key) {
-            cell <- {|cell with locked = false|};
-            phys_addr <@ phys_alloc(Cell cell);
-            virt_addr <@ malicious_virt_alloc(phys_addr);
-            r <- Some virt_addr;
-          }
-          else { r <- None; }
-        }
-        else { r <- None; }
-      }
-      else { r <- None; }
-    }
+    else { r <- None; }
     return r;
   }
 
   proc contents_cell(pty : party, cell_addr : addr) : bool option = {
     var r : bool option;
-    if (pty = Honest) {
-      if (cell_addr \in honest_virt_map) {
-        match oget phys_map.[oget honest_virt_map.[cell_addr]] with
-        | Key _     => { r <- None; }
-        | Cell cell => {
-            if (! cell.`locked) { r <- Some cell.`cont; }
-            else { r <- None; }
-          }
-        end;
-      }
-      else { r <- None; }
+    if (cell_addr \in oget virt_map.[pty]) {
+      match oget phys_map.[oget (oget virt_map.[pty]).[cell_addr]] with
+      | Key _     => { r <- None; }
+      | Cell cell => {
+          if (! cell.`locked) { r <- Some cell.`cont; }
+          else { r <- None; }
+        }
+      end;
     }
-    else {
-      if (cell_addr \in malicious_virt_map) {
-        match oget phys_map.[oget malicious_virt_map.[cell_addr]] with
-        | Key _     => { r <- None; }
-        | Cell cell => {
-            if (! cell.`locked) { r <- Some cell.`cont; }
-            else { r <- None; }
-          }
-        end;
-      }
-      else { r <- None; }
-    }
+    else { r <- None; }
     return r;
   }
 }.
@@ -384,46 +285,38 @@ module Memory : MEMORY = {
 
 type gm = glob Memory.
 
-op gm_to_next_key                 (gm : gm)  : key                 = gm.`5.
-op gm_to_next_phys_addr           (gm : gm)  : addr                = gm.`6.
-op gm_to_phys_map                 (gm : gm)  : (addr, object) fmap = gm.`7.
-op gm_to_honest_next_virt_addr    (gm : gm)  : addr                = gm.`1.
-op gm_to_honest_virt_map          (gm : gm)  : (addr, addr) fmap   = gm.`2.
-op gm_to_malicious_next_virt_addr (gm : gm)  : addr                = gm.`3.
-op gm_to_malicious_virt_map       (gm : gm)  : (addr, addr) fmap   = gm.`4.
+op gm_to_next_key       (gm : gm)  : key                             = gm.`1.
+op gm_to_next_phys_addr (gm : gm)  : addr                            = gm.`2.
+op gm_to_phys_map       (gm : gm)  : (addr, object) fmap             = gm.`4.
+op gm_to_next_virt_addr (gm : gm)  : (party, addr) fmap              = gm.`3.
+op gm_to_virt_map       (gm : gm)  : (party, (addr, addr) fmap) fmap = gm.`5.
 
 lemma gm_eqP (gm1 gm2 : gm) :
   gm_to_next_key gm1 = gm_to_next_key gm2 =>
   gm_to_next_phys_addr gm1 = gm_to_next_phys_addr gm2 =>
   gm_to_phys_map gm1 = gm_to_phys_map gm2 =>
-  gm_to_honest_next_virt_addr gm1 = gm_to_honest_next_virt_addr gm2 =>
-  gm_to_honest_virt_map gm1 = gm_to_honest_virt_map gm2 =>
-  gm_to_malicious_next_virt_addr gm1 = gm_to_malicious_next_virt_addr gm2 =>
-  gm_to_malicious_virt_map gm1 = gm_to_malicious_virt_map gm2 =>
+  gm_to_next_virt_addr gm1 = gm_to_next_virt_addr gm2 =>
+  gm_to_virt_map gm1 = gm_to_virt_map gm2 =>
   gm1 = gm2.
 proof. smt(). qed.
 
 (* invariant respected by the procedures of Memory *)
 
 op gm_invar_pre (gm : gm) : bool =
+  (forall (pty : party), pty \in gm_to_next_virt_addr gm) /\
+  (forall (pty : party), pty \in gm_to_virt_map gm) /\
   0 <= gm_to_next_key gm /\
   0 <= gm_to_next_phys_addr gm /\
-  0 <= gm_to_honest_next_virt_addr gm /\
-  0 <= gm_to_malicious_next_virt_addr gm /\
+  (forall (pty : party),
+   0 <= oget (gm_to_next_virt_addr gm).[pty]) /\
   (forall (addr : addr),
    addr \in gm_to_phys_map gm =>
    0 <= addr < gm_to_next_phys_addr gm) /\
-  (forall (addr : addr),
-   addr \in gm_to_honest_virt_map gm =>
-   0 <= addr < gm_to_honest_next_virt_addr gm) /\
-  (forall (addr : addr),
-   addr \in gm_to_malicious_virt_map gm =>
-   0 <= addr < gm_to_malicious_next_virt_addr gm) /\
-  (forall (addr : addr),
-   rng (gm_to_honest_virt_map gm) addr =>
-   addr \in gm_to_phys_map gm) /\
-  (forall (addr : addr),
-   rng (gm_to_malicious_virt_map gm) addr =>
+  (forall (pty : party, addr : addr),
+   addr \in oget (gm_to_virt_map gm).[pty] =>
+   0 <= addr < oget (gm_to_next_virt_addr gm).[pty]) /\
+  (forall (pty : party, addr : addr),
+   rng (oget (gm_to_virt_map gm).[pty]) addr =>
    addr \in gm_to_phys_map gm) /\
   (forall (addr1 addr2 : addr, key : key),
    (gm_to_phys_map gm).[addr1] = Some (Key key) =>
@@ -440,21 +333,21 @@ op gm_invar (gm : gm) : bool =
    (gm_to_phys_map gm).[addr] = Some (Key key) =>
    0 <= key < gm_to_next_key gm).
 
-lemma gm_invar_old_mal_virt_addr_does_not_give_new_key
-      (gm : gm, mal_virt_addr : addr) :
-  gm_invar gm => mal_virt_addr \in gm_to_malicious_virt_map gm =>
+lemma gm_invar_old_virt_addr_does_not_give_new_key
+      (gm : gm, pty : party, virt_addr : addr) :
+  gm_invar gm => virt_addr \in oget (gm_to_virt_map gm).[pty] =>
   let key = gm_to_next_key gm in
-  let phys_addr = oget (gm_to_malicious_virt_map gm).[mal_virt_addr] in
+  let phys_addr = oget (oget (gm_to_virt_map gm).[pty]).[virt_addr] in
   oget (gm_to_phys_map gm).[gm_to_next_phys_addr gm <- Key key].[phys_addr] <>
   Key key.
 proof.
-move => gm_invar_gm mal_virt_addr_in_dom_malicious_virt_map_of_gm /=.
+move => gm_invar_gm virt_addr_in_dom_virt_map_of_gm /=.
 have H1 :
-  oget (gm_to_malicious_virt_map gm).[mal_virt_addr] \in
-  gm_to_phys_map gm by smt().
+  oget (oget (gm_to_virt_map gm).[pty]).[virt_addr] \in
+  gm_to_phys_map gm by smt(get_some).
 have H2 :
-  oget (gm_to_malicious_virt_map gm).[mal_virt_addr] <>
-  gm_to_next_phys_addr gm by smt().
+  oget (oget (gm_to_virt_map gm).[pty]).[virt_addr] <>
+  gm_to_next_phys_addr gm by smt(get_some).
 rewrite get_setE H2 /= /#.
 qed.
 
@@ -470,16 +363,14 @@ lemma memory_init :
   hoare
   [Memory.init :
    true ==>
-   gm_invar (glob Memory)                  /\
-   Memory.next_key                 = 0     /\
-   Memory.next_phys_addr           = 0     /\
-   Memory.phys_map                 = empty /\
-   Memory.honest_next_virt_addr    = 0     /\
-   Memory.honest_virt_map          = empty /\
-   Memory.malicious_next_virt_addr = 0     /\
-   Memory.malicious_virt_map       = empty].
+   gm_invar (glob Memory) /\
+   Memory.next_key       = 0 /\
+   Memory.next_phys_addr = 0 /\
+   Memory.phys_map       = empty /\
+   Memory.next_virt_addr = empty.[Honest <- 0].[Malicious <- 0] /\
+   Memory.virt_map       = empty.[Honest <- empty].[Malicious <- empty]].
 proof.
-proc; auto; smt(mem_empty mem_rng_empty).
+proc; auto; smt(mem_set mem_empty mem_rng_empty get_setE get_some).
 qed.
 
 lemma memory_phys_alloc_key (gm : gm, key : key) :
@@ -493,16 +384,14 @@ lemma memory_phys_alloc_key (gm : gm, key : key) :
    gm_invar (glob Memory) /\
    (* unchanged *)
    Memory.next_key = gm_to_next_key gm /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm /\
+   Memory.next_virt_addr = gm_to_next_virt_addr gm /\
+   Memory.virt_map = gm_to_virt_map gm /\
    (* changed *)
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
    Memory.phys_map = (gm_to_phys_map gm).[gm_to_next_phys_addr gm <- Key key] /\
    res = gm_to_next_phys_addr gm].
 proof.
-proc; auto; smt(get_setE).
+proc; auto; progress; smt(get_setE).
 qed.
 
 lemma memory_phys_alloc_cell (gm : gm, cell : cell) :
@@ -514,59 +403,37 @@ lemma memory_phys_alloc_cell (gm : gm, cell : cell) :
    gm_invar (glob Memory) /\
    (* unchanged *)
    Memory.next_key = gm_to_next_key gm /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm /\
+   Memory.next_virt_addr = gm_to_next_virt_addr gm /\
+   Memory.virt_map = gm_to_virt_map gm /\
    (* changed *)
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
    Memory.phys_map = (gm_to_phys_map gm).[gm_to_next_phys_addr gm <- Cell cell] /\
    res = gm_to_next_phys_addr gm].
 proof.
-proc; auto; smt(get_setE).
+proc; auto; progress; smt(get_setE).
 qed.
 
-lemma memory_honest_virt_alloc (gm : gm, phys_addr' : addr) :
+lemma memory_virt_alloc (gm : gm, pty' : party, phys_addr' : addr) :
   hoare
-  [Memory.honest_virt_alloc :
-   phys_addr = phys_addr' /\ phys_addr' \in Memory.phys_map /\
+  [Memory.virt_alloc :
+   pty = pty' /\ phys_addr = phys_addr' /\ phys_addr' \in Memory.phys_map /\
    glob Memory = gm /\ gm_invar gm ==>
    gm_invar (glob Memory) /\
    (* unchanged *)
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm /\
    Memory.phys_map = gm_to_phys_map gm /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm /\
+   Memory.next_virt_addr.[other pty'] = (gm_to_next_virt_addr gm).[other pty'] /\
+   Memory.virt_map.[other pty'] = (gm_to_virt_map gm).[other pty'] /\
    (* changed *)
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm + 1 /\
-   Memory.honest_virt_map =
-   (gm_to_honest_virt_map gm).[gm_to_honest_next_virt_addr gm <- phys_addr'] /\
-   res = gm_to_honest_next_virt_addr gm].
+   oget Memory.next_virt_addr.[pty'] =
+     oget (gm_to_next_virt_addr gm).[pty'] + 1 /\
+   oget Memory.virt_map.[pty'] =
+   (oget (gm_to_virt_map gm).[pty'])
+     .[oget (gm_to_next_virt_addr gm).[pty'] <- phys_addr'] /\
+   res = oget (gm_to_next_virt_addr gm).[pty']].
 proof.
-proc; auto; smt(mem_set rng_set_new).
-qed.
-
-lemma memory_malicious_virt_alloc (gm : gm, phys_addr' : addr) :
-  hoare
-  [Memory.malicious_virt_alloc :
-   phys_addr = phys_addr' /\ phys_addr' \in Memory.phys_map /\
-   glob Memory = gm /\ gm_invar gm ==>
-   gm_invar (glob Memory) /\
-   (* unchanged *)
-   Memory.next_key = gm_to_next_key gm /\
-   Memory.next_phys_addr = gm_to_next_phys_addr gm /\
-   Memory.phys_map = gm_to_phys_map gm /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-   (* changed *)
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm + 1 /\
-   Memory.malicious_virt_map =
-   (gm_to_malicious_virt_map gm).[gm_to_malicious_next_virt_addr gm <-
-                                  phys_addr'] /\
-   res = gm_to_malicious_next_virt_addr gm].
-proof.
-proc; auto; smt(mem_set rng_set_new).
+proc; auto; smt(mem_set rng_set_new get_some get_setE).
 qed.
 
 lemma memory_trans_virt_addr_ll :
@@ -578,69 +445,51 @@ lemma memory_trans_virt_addr_gm_invar :
   [Memory.trans_virt_addr :
    gm_invar (glob Memory) ==> gm_invar (glob Memory)].
 proof.
-proc; inline*; auto; smt(mem_set rng_set_new).
+proc; inline*; auto.
+(progress; first 8 smt(get_setE get_some)); last 5 smt(get_setE get_some).
+rewrite /gm_to_next_virt_addr /=; smt(get_setE get_some).
 qed.
 
 lemma memory_trans_virt_addr (gm : gm, pty' : party, addr' : addr) :
   hoare
   [Memory.trans_virt_addr :
    pty = pty' /\ addr = addr' /\
-   (if pty = Honest
-    then addr \in Memory.honest_virt_map
-    else addr \in Memory.malicious_virt_map) /\
+   addr \in oget Memory.virt_map.[pty] /\
    glob Memory = gm /\ gm_invar gm ==>
    gm_invar (glob Memory) /\
    (* unchanged *)
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm /\
    Memory.phys_map = gm_to_phys_map gm /\
+   Memory.next_virt_addr.[pty'] = (gm_to_next_virt_addr gm).[pty'] /\
+   Memory.virt_map.[pty'] = (gm_to_virt_map gm).[pty'] /\
    (* changed *)
-   if pty' = Honest
-   then (let phys_addr = oget (Memory.honest_virt_map.[addr']) in
-         let virt_addr_malic = gm_to_malicious_next_virt_addr gm in
-         Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-         Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-         Memory.malicious_next_virt_addr = virt_addr_malic + 1 /\
-         Memory.malicious_virt_map =
-         (gm_to_malicious_virt_map gm).[virt_addr_malic <- phys_addr] /\
-         res = Some virt_addr_malic)
-   else (let phys_addr = oget (Memory.malicious_virt_map.[addr']) in
-         let virt_addr_honest = gm_to_honest_next_virt_addr gm in
-         Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-         Memory.malicious_virt_map = gm_to_malicious_virt_map gm /\
-         Memory.honest_next_virt_addr = virt_addr_honest + 1 /\
-         Memory.honest_virt_map =
-         (gm_to_honest_virt_map gm).[virt_addr_honest <- phys_addr] /\
-         res = Some virt_addr_honest)].
+   let phys_addr = oget (oget (Memory.virt_map.[pty'])).[addr'] in
+   let next_virt_addr_other = oget (gm_to_next_virt_addr gm).[other pty'] in
+   oget Memory.next_virt_addr.[other pty'] =
+     next_virt_addr_other + 1 /\
+   oget Memory.virt_map.[other pty'] =
+   (oget (gm_to_virt_map gm).[other pty'])
+     .[next_virt_addr_other <- phys_addr] /\
+   res = Some next_virt_addr_other].
 proof.
 proc.
 if.
-rcondt 1; first auto.
-sp.
-exlim phys_addr => pa'.
-exlim (glob Memory) => gm'.
-wp.
-call (memory_malicious_virt_alloc gm' pa').
-auto; smt().
-rcondt 1; first auto; smt().
-sp.
-exlim phys_addr => pa'.
-exlim (glob Memory) => gm'.
-wp.
-call (memory_honest_virt_alloc gm' pa').
+sp; wp.
+exlim (glob Memory), phys_addr => gm' pa'.
+call (memory_virt_alloc gm' (other pty') pa').
+auto; smt(get_setE get_some).
 auto; smt().
 qed.
 
 lemma memory_trans_virt_addr_bad (gm : gm) :
   hoare
   [Memory.trans_virt_addr :
-   (if pty = Honest
-    then addr \notin Memory.honest_virt_map
-    else addr \notin Memory.malicious_virt_map) /\
+   addr \notin oget Memory.virt_map.[pty] /\
    glob Memory = gm /\ gm_invar gm ==>
    glob Memory = gm /\ gm_invar (glob Memory)].
 proof.
-proc; if; [rcondf 1; auto | rcondf 1; auto; smt()].
+proc; inline*; if; auto.
 qed.
 
 lemma memory_create_key_ll : islossless Memory.create_key.
@@ -664,23 +513,15 @@ lemma memory_create_key (gm : gm, pty' : party) :
    Memory.phys_map =
    (gm_to_phys_map gm)
      .[gm_to_next_phys_addr gm <- Key (gm_to_next_key gm)] /\
-   (if pty' = Honest
-    then (Memory.honest_next_virt_addr =
-          gm_to_honest_next_virt_addr gm + 1 /\
-          Memory.honest_virt_map =
-          (gm_to_honest_virt_map gm)
-            .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = gm_to_honest_next_virt_addr gm /\
-          Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-          Memory.malicious_virt_map = gm_to_malicious_virt_map gm)
-    else (Memory.malicious_next_virt_addr =
-          gm_to_malicious_next_virt_addr gm + 1 /\
-          Memory.malicious_virt_map =
-          (gm_to_malicious_virt_map gm)
-            .[gm_to_malicious_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = gm_to_malicious_next_virt_addr gm /\
-          Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-          Memory.honest_virt_map = gm_to_honest_virt_map gm))].
+   oget Memory.next_virt_addr.[pty'] =
+   oget (gm_to_next_virt_addr gm).[pty'] + 1 /\
+   oget Memory.virt_map.[pty'] =
+   (oget (gm_to_virt_map gm).[pty'])
+     .[oget (gm_to_next_virt_addr gm).[pty'] <-
+       gm_to_next_phys_addr gm] /\
+   Memory.next_virt_addr.[other pty'] = (gm_to_next_virt_addr gm).[other pty'] /\
+   Memory.virt_map.[other pty'] = (gm_to_virt_map gm).[other pty'] /\
+   res = oget (gm_to_next_virt_addr gm).[pty']].
 proof.
 proc.
 sp.
@@ -691,51 +532,31 @@ seq 1 :
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
    Memory.phys_map =
    (gm_to_phys_map gm).[gm_to_next_phys_addr gm <- Key key] /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm) => //.
-auto.
+   Memory.next_virt_addr = gm_to_next_virt_addr gm /\
+   Memory.virt_map = gm_to_virt_map gm).
 exlim (glob Memory) => gm'.
 exlim key => key'.
 call (memory_phys_alloc_key gm' key').
 auto; smt().
-if.
 exlim (glob Memory) => gm'.
 exlim phys_addr => phys_addr'.
-call (memory_honest_virt_alloc gm' phys_addr').
-auto; progress; smt(mem_set get_setE).
-exlim (glob Memory) => gm'.
-exlim phys_addr => phys_addr'.
-call (memory_malicious_virt_alloc gm' phys_addr').
-auto; progress; smt(mem_set get_setE).
+call (memory_virt_alloc gm' pty' phys_addr').
+auto; smt(mem_set get_setE).
 qed.
 
 op key_addr_good (pty : party, gm : gm, key_addr : addr) : bool =
-  if pty = Honest
-  then (key_addr \in (gm_to_honest_virt_map gm) /\
-        is_key
-        (oget
-         ((gm_to_phys_map gm)
-            .[oget ((gm_to_honest_virt_map gm).[key_addr])])))
-  else (key_addr \in (gm_to_malicious_virt_map gm) /\
-        is_key
-        (oget
-         ((gm_to_phys_map gm)
-            .[oget ((gm_to_malicious_virt_map gm).[key_addr])]))).
+  key_addr \in oget (gm_to_virt_map gm).[pty] /\
+  is_key
+  (oget
+   ((gm_to_phys_map gm)
+      .[oget (oget (gm_to_virt_map gm).[pty]).[key_addr]])).
 
 op key_addr_to_key (pty : party, gm : gm, key_addr : addr) : key =
-  if pty = Honest
-  then oget
-       (get_as_Key
-        (oget
-         ((gm_to_phys_map gm)
-            .[oget ((gm_to_honest_virt_map gm).[key_addr])])))
-  else oget
-       (get_as_Key
-        (oget
-         ((gm_to_phys_map gm)
-            .[oget ((gm_to_malicious_virt_map gm).[key_addr])]))).
+  oget
+  (get_as_Key
+   (oget
+    ((gm_to_phys_map gm)
+       .[oget (oget (gm_to_virt_map gm).[pty]).[key_addr]]))).
 
 lemma memory_is_key_ll : islossless Memory.is_key.
 proof. islossless. qed.
@@ -769,7 +590,6 @@ lemma memory_create_cell_ll : islossless Memory.create_cell.
 proof.
 islossless.
 match; islossless.
-match; islossless.
 qed.
 
 lemma memory_create_cell_gm_invar :
@@ -777,13 +597,15 @@ lemma memory_create_cell_gm_invar :
   [Memory.create_cell :
    gm_invar (glob Memory) ==> gm_invar (glob Memory)].
 proof.
-proc; if; if.
+proc; if.
 match.
-inline*; auto; progress; smt(mem_set get_setE).
-auto.
-auto.
-match.
-inline*; auto; progress; smt(mem_set get_setE).
+(inline*; auto; progress; first 11 smt(mem_set get_setE oget_some));
+  last 2 smt(get_setE oget_some).
+move : H2; rewrite /gm_to_phys_map /= get_setE.
+case (addr = Memory.next_phys_addr{hr}) => /= [addr_eq_npa <- | addr_ne_npa].
+exists (oget (oget Memory.virt_map{hr}.[pty{hr}]).[key_addr{hr}]).
+smt(get_setE oget_some some_oget).
+smt(get_setE oget_some some_oget).
 auto.
 auto.
 qed.
@@ -797,43 +619,29 @@ lemma memory_create_cell
    gm_invar (glob Memory) /\
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
-   (if pty' = Honest
-    then (let key = key_addr_to_key Honest gm key_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|key = key; cont = b'; locked = true|}] /\
-          Memory.honest_next_virt_addr =
-          gm_to_honest_next_virt_addr gm + 1 /\
-          Memory.honest_virt_map =
-          (gm_to_honest_virt_map gm)
-             .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_honest_next_virt_addr gm) /\
-          Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-          Memory.malicious_virt_map = gm_to_malicious_virt_map gm)
-    else (let key = key_addr_to_key Malicious gm key_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|key = key; cont = b'; locked = true|}] /\
-          Memory.malicious_next_virt_addr =
-          gm_to_malicious_next_virt_addr gm + 1 /\
-          Memory.malicious_virt_map =
-          (gm_to_malicious_virt_map gm)
-             .[gm_to_malicious_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_malicious_next_virt_addr gm) /\
-          Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-          Memory.honest_virt_map = gm_to_honest_virt_map gm))].
+   Memory.phys_map =
+   (gm_to_phys_map gm)
+      .[gm_to_next_phys_addr gm <-
+        Cell
+        {|key = key_addr_to_key pty' gm key_addr';
+          cont = b'; locked = true|}] /\
+   oget Memory.next_virt_addr.[pty'] =
+   oget (gm_to_next_virt_addr gm).[pty'] + 1 /\
+   oget Memory.virt_map.[pty'] =
+   (oget (gm_to_virt_map gm).[pty'])
+      .[oget (gm_to_next_virt_addr gm).[pty'] <- gm_to_next_phys_addr gm] /\
+   Memory.next_virt_addr.[other pty'] = (gm_to_next_virt_addr gm).[other pty'] /\
+   Memory.virt_map.[other pty'] = (gm_to_virt_map gm).[other pty'] /\
+   res = Some (oget (gm_to_next_virt_addr gm).[pty'])].
 proof.
-proc.
-if.
+proc => /=.
 rcondt 1; first auto; smt().
 match Key 1; first auto; smt().
 exlim key => key'.
 seq 1 :
-  (pty = pty' /\ pty' = Honest /\ key_addr' \in gm_to_honest_virt_map gm /\
-   key_addr_good Honest gm key_addr' /\
-   key' = key_addr_to_key Honest gm key_addr' /\
+  (pty = pty' /\ key_addr' \in oget (gm_to_virt_map gm).[pty'] /\
+   key_addr_good pty' gm key_addr' /\
+   key' = key_addr_to_key pty' gm key_addr' /\
    gm_invar gm /\ phys_addr = gm_to_next_phys_addr gm /\
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
@@ -841,42 +649,19 @@ seq 1 :
    (gm_to_phys_map gm)
      .[gm_to_next_phys_addr gm <-
        Cell {|key = key'; cont = b'; locked = true|}] /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm) => //.
+   Memory.next_virt_addr = gm_to_next_virt_addr gm /\
+   Memory.virt_map = gm_to_virt_map gm).
 call (memory_phys_alloc_cell gm {|key = key'; cont = b'; locked = true|}).
-auto; progress; smt().
+auto; progress [-delta];
+  have /# :
+    Memory.phys_map{hr}
+      .[oget (oget Memory.virt_map{hr}.[pty{hr}]).[key_addr{hr}]] =
+    Some (Key key{hr}) by smt(get_some).
 wp.
 exlim (glob Memory) => gm'.
 exlim phys_addr => phys_addr'.
-call (memory_honest_virt_alloc gm' phys_addr').
+call (memory_virt_alloc gm' pty' phys_addr').
 auto => /> /= ; progress; smt(mem_set get_setE).
-rcondt 1; first auto; smt().
-match Key 1; first auto; smt().
-exlim key => key'.
-seq 1 :
-  (pty = pty' /\ pty' = Malicious /\ key_addr' \in gm_to_malicious_virt_map gm /\
-   key_addr_good Malicious gm key_addr' /\
-   key' = key_addr_to_key Malicious gm key_addr' /\
-   gm_invar gm /\ phys_addr = gm_to_next_phys_addr gm /\
-   Memory.next_key = gm_to_next_key gm /\
-   Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
-   Memory.phys_map =
-   (gm_to_phys_map gm)
-     .[gm_to_next_phys_addr gm <-
-       Cell {|key = key'; cont = b'; locked = true|}] /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm) => //.
-call (memory_phys_alloc_cell gm {|key = key'; cont = b'; locked = true|}).
-auto; progress; smt().
-wp.
-exlim (glob Memory) => gm'.
-exlim phys_addr => phys_addr'.
-call (memory_malicious_virt_alloc gm' phys_addr').
-auto => /> /=; progress; smt(mem_set get_setE).
 qed.
 
 lemma memory_create_cell_bad (gm : gm) :
@@ -888,40 +673,28 @@ lemma memory_create_cell_bad (gm : gm) :
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm /\
    Memory.phys_map = gm_to_phys_map gm /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm /\
+   Memory.next_virt_addr = gm_to_next_virt_addr gm /\
+   Memory.virt_map = gm_to_virt_map gm /\
    res = None].
 proof.
-proc; if; (if; [match Cell 1; [auto; smt() | auto] | auto]).
+proc => /=; if.
+match Cell 1; auto; smt().
+auto.
 qed.
 
 op cell_addr_good (pty : party, gm : gm, cell_addr : addr) : bool =
-  if pty = Honest
-  then (cell_addr \in (gm_to_honest_virt_map gm) /\
-        is_cell
-        (oget
-         ((gm_to_phys_map gm)
-            .[oget ((gm_to_honest_virt_map gm).[cell_addr])])))
-  else (cell_addr \in (gm_to_malicious_virt_map gm) /\
-        is_cell
-        (oget
-         ((gm_to_phys_map gm)
-            .[oget ((gm_to_malicious_virt_map gm).[cell_addr])]))).
+  cell_addr \in oget (gm_to_virt_map gm).[pty] /\
+  is_cell
+  (oget
+   ((gm_to_phys_map gm)
+      .[oget (oget (gm_to_virt_map gm).[pty]).[cell_addr]])).
 
 op cell_addr_to_cell (pty : party, gm : gm, cell_addr : addr) : cell =
-  if pty = Honest
-  then oget
-       (get_as_Cell
-        (oget
-         ((gm_to_phys_map gm)
-            .[oget ((gm_to_honest_virt_map gm).[cell_addr])])))
-  else oget
-       (get_as_Cell
-        (oget
-         ((gm_to_phys_map gm)
-            .[oget ((gm_to_malicious_virt_map gm).[cell_addr])]))).
+  oget
+  (get_as_Cell
+   (oget
+    ((gm_to_phys_map gm)
+       .[oget (oget (gm_to_virt_map gm).[pty]).[cell_addr]]))).
 
 lemma good_cell_addr_key_in_mem (pty : party, gm : gm, cell_addr : addr) :
   gm_invar gm => cell_addr_good pty gm cell_addr =>
@@ -931,21 +704,17 @@ lemma good_cell_addr_key_in_mem (pty : party, gm : gm, cell_addr : addr) :
 proof.
 move => gmi_gm.
 rewrite /cell_addr_good /cell_addr_to_cell.
-case pty => /=.
 move => [H1 H2].
 have [cell H3] :
   exists cell,
-  oget (gm_to_phys_map gm)
-         .[oget (gm_to_honest_virt_map gm).[cell_addr]] =
+  oget
+  (gm_to_phys_map gm)
+    .[oget (oget (gm_to_virt_map gm).[pty]).[cell_addr]] =
   Cell cell by smt().
-rewrite /get_as_Cell H3 /= /#.
-move => [H1 H2].
-have [cell H3] :
-  exists cell,
-  oget (gm_to_phys_map gm)
-         .[oget (gm_to_malicious_virt_map gm).[cell_addr]] =
-  Cell cell by smt().
-rewrite /get_as_Cell H3 /= /#.
+rewrite /get_as_Cell H3 /=.
+have /# :
+  (gm_to_phys_map gm).[oget (oget (gm_to_virt_map gm).[pty]).[cell_addr]] =
+  Some (Cell cell) by smt(get_some).
 qed.
 
 op good_cell_addr_unlocked_by_good_key_addr
@@ -995,80 +764,12 @@ lemma memory_unlock_cell_gm_invar :
   [Memory.unlock_cell :
    gm_invar (glob Memory) ==> gm_invar (glob Memory)].
 proof.
-proc; if; if; sp.
-if.
-sp.
-if.
+proc; if; last auto.
+sp; if; last auto.
+sp; if; last auto.
 sp; wp; elim* => cell0; inline*.
-(auto; progress; first 4 smt()); first 6 smt(get_setE).
-smt(get_setE rng_set_new). smt(get_setE). smt(get_setE).
-rewrite /gm_to_phys_map /= in H5. rewrite /gm_to_phys_map /=.
-case (addr = Memory.next_phys_addr{hr}) => [eq_addr_npa | neq_addr_npa].
-move : H5.
-rewrite get_setE eq_addr_npa /=.
-move => <- /=.
-pose cell1 :=
-  oget
-  (get_as_Cell
-   (oget
-    Memory.phys_map{hr}
-      .[oget Memory.honest_virt_map{hr}.[cell_addr{hr}]])).
-have [addr'] eq_pm_addr'_cell1_key :
-  exists addr',
-  Memory.phys_map{hr}.[addr'] = Some (Key cell1.`key) by smt().
-exists addr'.
-have ne_addr'_npa : addr' <> Memory.next_phys_addr{hr} by smt(domE).
-by rewrite get_setE ne_addr'_npa /=.
-move : H5 => H5.
-rewrite get_setE neq_addr_npa /= in H5.
-have [addr' eq_pm_addr'_cell0_key] :
-  exists addr',
-  Memory.phys_map{hr}.[addr'] = Some (Key cell0.`key)
-    by smt().
-exists addr'.
-have neq_addr'_npa : addr' <> Memory.next_phys_addr{hr} by smt(domE).
-by rewrite get_setE neq_addr'_npa /=.
-smt(get_setE). smt(get_setE).
-auto.
-auto.
-auto.
-if.
-sp.
-if.
-sp; wp; elim* => cell0; inline*.
-(auto; progress; first 4 smt()); first 6 smt(get_setE).
-smt(get_setE rng_set_new). smt(mem_set get_setE).
-smt(get_setE).
-rewrite /gm_to_phys_map /= in H6. rewrite /gm_to_phys_map /=.
-case (addr = Memory.next_phys_addr{hr}) => [eq_addr_npa | neq_addr_npa].
-move : H6.
-rewrite get_setE eq_addr_npa /=.
-move => <- /=.
-pose cell1 :=
-  oget
-  (get_as_Cell
-   (oget
-    Memory.phys_map{hr}
-      .[oget Memory.malicious_virt_map{hr}.[cell_addr{hr}]])).
-have [addr'] eq_pm_addr'_cell1_key :
-  exists addr',
-  Memory.phys_map{hr}.[addr'] = Some (Key cell1.`key) by smt().
-exists addr'.
-have ne_addr'_npa : addr' <> Memory.next_phys_addr{hr} by smt(domE).
-by rewrite get_setE ne_addr'_npa /=.
-move : H6 => H6.
-rewrite get_setE neq_addr_npa /= in H6.
-have [addr' eq_pm_addr'_cell0_key] :
-  exists addr',
-  Memory.phys_map{hr}.[addr'] = Some (Key cell0.`key)
-    by smt().
-exists addr'.
-have neq_addr'_npa : addr' <> Memory.next_phys_addr{hr} by smt(domE).
-by rewrite get_setE neq_addr'_npa /=.
-smt(get_setE). smt(get_setE).
-auto.
-auto.
-auto.
+(auto; progress; first 7 smt(get_setE)); last 6 smt(oget_some get_setE).
+move : H5; rewrite /gm_to_virt_map /= get_setE /=; smt(mem_set).
 qed.
 
 lemma memory_unlock_cell (gm : gm , pty' : party, cell_addr' key_addr' : addr) :
@@ -1081,48 +782,33 @@ lemma memory_unlock_cell (gm : gm , pty' : party, cell_addr' key_addr' : addr) :
    gm_invar (glob Memory) /\
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
-   (if pty' = Honest
-    then (let cell = cell_addr_to_cell Honest gm cell_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|cell with locked = false|}] /\
-          Memory.honest_next_virt_addr =
-          gm_to_honest_next_virt_addr gm + 1 /\
-          Memory.honest_virt_map =
-          (gm_to_honest_virt_map gm)
-             .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_honest_next_virt_addr gm) /\
-          Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-          Memory.malicious_virt_map = gm_to_malicious_virt_map gm)
-    else (let cell = cell_addr_to_cell Malicious gm cell_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|cell with locked = false|}] /\
-          Memory.malicious_next_virt_addr =
-          gm_to_malicious_next_virt_addr gm + 1 /\
-          Memory.malicious_virt_map =
-          (gm_to_malicious_virt_map gm)
-             .[gm_to_malicious_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_malicious_next_virt_addr gm) /\
-          Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-          Memory.honest_virt_map = gm_to_honest_virt_map gm))].
+   Memory.phys_map =
+   (gm_to_phys_map gm)
+     .[gm_to_next_phys_addr gm <-
+       Cell
+       {|(cell_addr_to_cell pty' gm cell_addr') with locked = false|}] /\
+   oget Memory.next_virt_addr.[pty'] =
+   oget (gm_to_next_virt_addr gm).[pty'] + 1 /\
+   oget Memory.virt_map.[pty'] =
+   (oget (gm_to_virt_map gm).[pty'])
+     .[oget (gm_to_next_virt_addr gm).[pty'] <- gm_to_next_phys_addr gm] /\
+   Memory.next_virt_addr.[other pty'] = 
+   (gm_to_next_virt_addr gm).[other pty'] /\
+   Memory.virt_map.[other pty'] =  (gm_to_virt_map gm).[other pty'] /\
+   res = Some (oget (gm_to_next_virt_addr gm).[pty'])].
 proof.
 proc.
-if.
 rcondt 1; first auto; smt().
 sp 2.
 rcondt 1; first auto; smt().
 sp 2.
 rcondt 1; first auto; smt().
 sp 1.
-elim* => cell'.
-rewrite /=.
+elim* => cell' /=.
 seq 1 :
-  (pty = pty' /\ pty' = Honest /\ gm_invar gm /\
+  (pty = pty' /\ gm_invar gm /\
    cell' = cell_addr_to_cell pty gm cell_addr' /\
-   cell_addr_good Honest gm cell_addr' /\
+   cell_addr_good pty gm cell_addr' /\
    phys_addr = gm_to_next_phys_addr gm /\
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
@@ -1130,46 +816,14 @@ seq 1 :
    (gm_to_phys_map gm)
      .[gm_to_next_phys_addr gm <-
        Cell {|cell' with locked = false|}] /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm) => //.
+   Memory.next_virt_addr = gm_to_next_virt_addr gm /\
+   Memory.virt_map = gm_to_virt_map gm).
 call (memory_phys_alloc_cell gm {|cell' with locked = false|}).
 auto; smt().
 wp => /=.
 exlim (glob Memory) => gm'.
 exlim phys_addr => phys_addr'.
-call (memory_honest_virt_alloc gm' phys_addr').
-auto; progress; smt(mem_set rng_set_new get_setE good_cell_addr_key_in_mem).
-rcondt 1; first auto; smt().
-sp 2.
-rcondt 1; first auto; smt().
-sp 2.
-rcondt 1; first auto; smt().
-sp 1.
-elim* => cell'.
-rewrite /=.
-seq 1 :
-  (pty = pty' /\ pty' = Malicious /\ gm_invar gm /\
-   cell' = cell_addr_to_cell pty gm cell_addr' /\
-   cell_addr_good Malicious gm cell_addr' /\
-   phys_addr = gm_to_next_phys_addr gm /\
-   Memory.next_key = gm_to_next_key gm /\
-   Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
-   Memory.phys_map =
-   (gm_to_phys_map gm)
-     .[gm_to_next_phys_addr gm <-
-       Cell {|cell' with locked = false|}] /\
-   Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-   Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-   Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map = gm_to_malicious_virt_map gm) => //.
-call (memory_phys_alloc_cell gm {|cell' with locked = false|}).
-auto; progress; smt().
-wp => /=.
-exlim (glob Memory) => gm'.
-exlim phys_addr => phys_addr'.
-call (memory_malicious_virt_alloc gm' phys_addr').
+call (memory_virt_alloc gm' pty' phys_addr').
 auto; progress; smt(mem_set rng_set_new get_setE good_cell_addr_key_in_mem).
 qed.
 
@@ -1184,13 +838,12 @@ lemma memory_unlock_cell_bad
    glob Memory = gm /\ gm_invar (glob Memory) /\ res = None].
 proof.
 proc.
-if; (if; [sp; if; [sp; if; [exfalso; smt() | auto] | auto] | auto]).
+if; [sp; if; [sp; if; [exfalso; smt() | auto] | auto] | auto].
 qed.
 
 lemma memory_contents_cell_ll : islossless Memory.contents_cell.
 proof.
 islossless.
-match; islossless.
 match; islossless.
 qed.
 
@@ -1214,11 +867,6 @@ lemma memory_contents_cell (gm : gm , pty' : party, cell_addr' : addr) :
     res = Some cell.`cont)].
 proof.
 proc.
-if.
-rcondt 1; first auto; smt().
-match Cell 1; first auto; smt().
-rcondt 1; first auto; smt().
-auto; smt().
 rcondt 1; first auto; smt().
 match Cell 1; first auto; smt().
 rcondt 1; first auto; smt().
@@ -1235,21 +883,11 @@ lemma memory_contents_cell_bad (gm : gm , pty' : party, cell_addr' : addr) :
    glob Memory = gm /\ gm_invar (glob Memory) /\
    res = None].
 proof.
-proc.
-if.
-if.
-case
-  (exists (key : key),
-   oget Memory.phys_map.[oget Memory.honest_virt_map.[cell_addr]] =
-   Key key).
-match Key 1; auto.
-match Cell 1; first auto; smt().
-rcondf 1; auto; smt().
-auto.
+proc => /=.
 if.
 case
   (exists (key : key),
-   oget Memory.phys_map.[oget Memory.malicious_virt_map.[cell_addr]] =
+   oget Memory.phys_map.[oget (oget Memory.virt_map.[pty']).[cell_addr]] =
    Key key).
 match Key 1; auto.
 match Cell 1; first auto; smt().
@@ -1443,34 +1081,24 @@ qed.
 lemma party_memory_trans_virt_addr (gm : gm, addr' : addr) :
   hoare
   [PartyMemory.trans_virt_addr :
-   addr = addr' /\
-   (if party = Honest
-    then addr \in Memory.honest_virt_map
-    else addr \in Memory.malicious_virt_map) /\
+   addr = addr' /\ addr \in oget Memory.virt_map.[party] /\
    glob Memory = gm /\ gm_invar gm ==>
    gm_invar (glob Memory) /\
    (* unchanged *)
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm /\
    Memory.phys_map = gm_to_phys_map gm /\
+   Memory.next_virt_addr.[party] = (gm_to_next_virt_addr gm).[party] /\
+   Memory.virt_map.[party] = (gm_to_virt_map gm).[party] /\
    (* changed *)
-   if party = Honest
-   then (let phys_addr = oget (Memory.honest_virt_map.[addr']) in
-         let virt_addr_malic = gm_to_malicious_next_virt_addr gm in
-         Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-         Memory.honest_virt_map = gm_to_honest_virt_map gm /\
-         Memory.malicious_next_virt_addr = virt_addr_malic + 1 /\
-         Memory.malicious_virt_map =
-         (gm_to_malicious_virt_map gm).[virt_addr_malic <- phys_addr] /\
-         res = Some virt_addr_malic)
-   else (let phys_addr = oget (Memory.malicious_virt_map.[addr']) in
-         let virt_addr_honest = gm_to_honest_next_virt_addr gm in
-         Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-         Memory.malicious_virt_map = gm_to_malicious_virt_map gm /\
-         Memory.honest_next_virt_addr = virt_addr_honest + 1 /\
-         Memory.honest_virt_map =
-         (gm_to_honest_virt_map gm).[virt_addr_honest <- phys_addr] /\
-         res = Some virt_addr_honest)].
+   let phys_addr = oget (oget (Memory.virt_map.[party])).[addr'] in
+   let next_virt_addr_other = oget (gm_to_next_virt_addr gm).[other party] in
+   oget Memory.next_virt_addr.[other party] =
+     next_virt_addr_other + 1 /\
+   oget Memory.virt_map.[other party] =
+   (oget (gm_to_virt_map gm).[other party])
+     .[next_virt_addr_other <- phys_addr] /\
+   res = Some next_virt_addr_other].
 proof.
 proc.
 call (memory_trans_virt_addr gm party addr').
@@ -1499,23 +1127,15 @@ lemma party_memory_create_key (gm : gm) :
    Memory.phys_map =
    (gm_to_phys_map gm)
      .[gm_to_next_phys_addr gm <- Key (gm_to_next_key gm)] /\
-   (if party = Honest
-    then (Memory.honest_next_virt_addr =
-          gm_to_honest_next_virt_addr gm + 1 /\
-          Memory.honest_virt_map =
-          (gm_to_honest_virt_map gm)
-            .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = gm_to_honest_next_virt_addr gm /\
-          Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-          Memory.malicious_virt_map = gm_to_malicious_virt_map gm)
-    else (Memory.malicious_next_virt_addr =
-          gm_to_malicious_next_virt_addr gm + 1 /\
-          Memory.malicious_virt_map =
-          (gm_to_malicious_virt_map gm)
-            .[gm_to_malicious_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = gm_to_malicious_next_virt_addr gm /\
-          Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-          Memory.honest_virt_map = gm_to_honest_virt_map gm))].
+   oget Memory.next_virt_addr.[party] =
+   oget (gm_to_next_virt_addr gm).[party] + 1 /\
+   oget Memory.virt_map.[party] =
+   (oget (gm_to_virt_map gm).[party])
+     .[oget (gm_to_next_virt_addr gm).[party] <-
+       gm_to_next_phys_addr gm] /\
+   Memory.next_virt_addr.[other party] = (gm_to_next_virt_addr gm).[other party] /\
+   Memory.virt_map.[other party] = (gm_to_virt_map gm).[other party] /\
+   res = oget (gm_to_next_virt_addr gm).[party]].
 proof.
 proc.
 call (memory_create_key gm party).
@@ -1534,23 +1154,15 @@ lemma party_memory_create_key_phl (gm : gm) :
    Memory.phys_map =
    (gm_to_phys_map gm)
      .[gm_to_next_phys_addr gm <- Key (gm_to_next_key gm)] /\
-   (if party = Honest
-    then (Memory.honest_next_virt_addr =
-          gm_to_honest_next_virt_addr gm + 1 /\
-          Memory.honest_virt_map =
-          (gm_to_honest_virt_map gm)
-            .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = gm_to_honest_next_virt_addr gm /\
-          Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-          Memory.malicious_virt_map = gm_to_malicious_virt_map gm)
-    else (Memory.malicious_next_virt_addr =
-          gm_to_malicious_next_virt_addr gm + 1 /\
-          Memory.malicious_virt_map =
-          (gm_to_malicious_virt_map gm)
-            .[gm_to_malicious_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = gm_to_malicious_next_virt_addr gm /\
-          Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-          Memory.honest_virt_map = gm_to_honest_virt_map gm))] = 1%r.
+   oget Memory.next_virt_addr.[party] =
+   oget (gm_to_next_virt_addr gm).[party] + 1 /\
+   oget Memory.virt_map.[party] =
+   (oget (gm_to_virt_map gm).[party])
+     .[oget (gm_to_next_virt_addr gm).[party] <-
+       gm_to_next_phys_addr gm] /\
+   Memory.next_virt_addr.[other party] = (gm_to_next_virt_addr gm).[other party] /\
+   Memory.virt_map.[other party] = (gm_to_virt_map gm).[other party] /\
+   res = oget (gm_to_next_virt_addr gm).[party]] = 1%r.
 proof.
 conseq (_ : true ==> true) (_ : _ ==> _) => //.
 apply (party_memory_create_key gm).
@@ -1614,33 +1226,20 @@ lemma party_memory_create_cell (gm : gm, key_addr' : addr, b' : bool) :
    gm_invar (glob Memory) /\
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
-   (if party = Honest
-    then (let key = key_addr_to_key Honest gm key_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|key = key; cont = b'; locked = true|}] /\
-          Memory.honest_next_virt_addr =
-          gm_to_honest_next_virt_addr gm + 1 /\
-          Memory.honest_virt_map =
-          (gm_to_honest_virt_map gm)
-             .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_honest_next_virt_addr gm) /\
-          Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-          Memory.malicious_virt_map = gm_to_malicious_virt_map gm)
-    else (let key = key_addr_to_key Malicious gm key_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|key = key; cont = b'; locked = true|}] /\
-          Memory.malicious_next_virt_addr =
-          gm_to_malicious_next_virt_addr gm + 1 /\
-          Memory.malicious_virt_map =
-          (gm_to_malicious_virt_map gm)
-             .[gm_to_malicious_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_malicious_next_virt_addr gm) /\
-          Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-          Memory.honest_virt_map = gm_to_honest_virt_map gm))].
+   Memory.phys_map =
+   (gm_to_phys_map gm)
+      .[gm_to_next_phys_addr gm <-
+        Cell
+        {|key = key_addr_to_key party gm key_addr';
+          cont = b'; locked = true|}] /\
+   oget Memory.next_virt_addr.[party] =
+   oget (gm_to_next_virt_addr gm).[party] + 1 /\
+   oget Memory.virt_map.[party] =
+   (oget (gm_to_virt_map gm).[party])
+      .[oget (gm_to_next_virt_addr gm).[party] <- gm_to_next_phys_addr gm] /\
+   Memory.next_virt_addr.[other party] = (gm_to_next_virt_addr gm).[other party] /\
+   Memory.virt_map.[other party] = (gm_to_virt_map gm).[other party] /\
+   res = Some (oget (gm_to_next_virt_addr gm).[party])].
 proof.
 proc.
 call (memory_create_cell gm party key_addr' b').
@@ -1655,33 +1254,20 @@ lemma party_memory_create_cell_phl (gm : gm, key_addr' : addr, b' : bool) :
    gm_invar (glob Memory) /\
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
-   (if party = Honest
-    then (let key = key_addr_to_key Honest gm key_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|key = key; cont = b'; locked = true|}] /\
-          Memory.honest_next_virt_addr =
-          gm_to_honest_next_virt_addr gm + 1 /\
-          Memory.honest_virt_map =
-          (gm_to_honest_virt_map gm)
-             .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_honest_next_virt_addr gm) /\
-          Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-          Memory.malicious_virt_map = gm_to_malicious_virt_map gm)
-    else (let key = key_addr_to_key Malicious gm key_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|key = key; cont = b'; locked = true|}] /\
-          Memory.malicious_next_virt_addr =
-          gm_to_malicious_next_virt_addr gm + 1 /\
-          Memory.malicious_virt_map =
-          (gm_to_malicious_virt_map gm)
-             .[gm_to_malicious_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_malicious_next_virt_addr gm) /\
-          Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-          Memory.honest_virt_map = gm_to_honest_virt_map gm))] = 1%r.
+   Memory.phys_map =
+   (gm_to_phys_map gm)
+      .[gm_to_next_phys_addr gm <-
+        Cell
+        {|key = key_addr_to_key party gm key_addr';
+          cont = b'; locked = true|}] /\
+   oget Memory.next_virt_addr.[party] =
+   oget (gm_to_next_virt_addr gm).[party] + 1 /\
+   oget Memory.virt_map.[party] =
+   (oget (gm_to_virt_map gm).[party])
+      .[oget (gm_to_next_virt_addr gm).[party] <- gm_to_next_phys_addr gm] /\
+   Memory.next_virt_addr.[other party] = (gm_to_next_virt_addr gm).[other party] /\
+   Memory.virt_map.[other party] = (gm_to_virt_map gm).[other party] /\
+   res = Some (oget (gm_to_next_virt_addr gm).[party])] = 1%r.
 proof.
 conseq (_ : true ==> true) (_ : _ ==> _) => //.
 apply (party_memory_create_cell gm key_addr' b').
@@ -1747,33 +1333,20 @@ lemma party_memory_unlock_cell (gm : gm , cell_addr' key_addr' : addr) :
    gm_invar (glob Memory) /\
    Memory.next_key = gm_to_next_key gm /\
    Memory.next_phys_addr = gm_to_next_phys_addr gm + 1 /\
-   (if party = Honest
-    then (let cell = cell_addr_to_cell Honest gm cell_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|cell with locked = false|}] /\
-          Memory.honest_next_virt_addr =
-          gm_to_honest_next_virt_addr gm + 1 /\
-          Memory.honest_virt_map =
-          (gm_to_honest_virt_map gm)
-             .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_honest_next_virt_addr gm) /\
-          Memory.malicious_next_virt_addr = gm_to_malicious_next_virt_addr gm /\
-          Memory.malicious_virt_map = gm_to_malicious_virt_map gm)
-    else (let cell = cell_addr_to_cell Malicious gm cell_addr' in
-          Memory.phys_map =
-          (gm_to_phys_map gm)
-             .[gm_to_next_phys_addr gm <-
-               Cell {|cell with locked = false|}] /\
-          Memory.malicious_next_virt_addr =
-          gm_to_malicious_next_virt_addr gm + 1 /\
-          Memory.malicious_virt_map =
-          (gm_to_malicious_virt_map gm)
-             .[gm_to_malicious_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-          res = Some (gm_to_malicious_next_virt_addr gm) /\
-          Memory.honest_next_virt_addr = gm_to_honest_next_virt_addr gm /\
-          Memory.honest_virt_map = gm_to_honest_virt_map gm))].
+   Memory.phys_map =
+   (gm_to_phys_map gm)
+     .[gm_to_next_phys_addr gm <-
+       Cell
+       {|(cell_addr_to_cell party gm cell_addr') with locked = false|}] /\
+   oget Memory.next_virt_addr.[party] =
+   oget (gm_to_next_virt_addr gm).[party] + 1 /\
+   oget Memory.virt_map.[party] =
+   (oget (gm_to_virt_map gm).[party])
+     .[oget (gm_to_next_virt_addr gm).[party] <- gm_to_next_phys_addr gm] /\
+   Memory.next_virt_addr.[other party] = 
+   (gm_to_next_virt_addr gm).[other party] /\
+   Memory.virt_map.[other party] =  (gm_to_virt_map gm).[other party] /\
+   res = Some (oget (gm_to_next_virt_addr gm).[party])].
 proof.
 proc.
 call (memory_unlock_cell gm party cell_addr' key_addr').
@@ -2290,13 +1863,10 @@ local lemma Exper_distinguish :
     then OtherHonest.HPS_Guesser_WaitFromAdvGuess
     else OtherHonest.HPS_Chooser_WaitFromAdvChoice) /\
    gm_invar (glob Memory) /\
-   Memory.next_key = 0 /\
-   Memory.next_phys_addr = 0 /\
+   Memory.next_key = 0 /\ Memory.next_phys_addr = 0 /\
    Memory.phys_map = empty /\
-   Memory.honest_next_virt_addr = 0 /\
-   Memory.honest_virt_map = empty /\
-   Memory.malicious_next_virt_addr = 0 /\
-   Memory.malicious_virt_map = empty ==>
+   Memory.next_virt_addr = empty.[Honest <- 0].[Malicious <- 0] /\
+   Memory.virt_map       = empty.[Honest <- empty].[Malicious <- empty] ==>
    res].
 proof.
 proc.
@@ -2322,14 +1892,14 @@ seq 1 :
       .[0 <- Key 0]
       .[1 <- Cell {|key = 0; cont = choice; locked = true|}] /\
   (if CorrectAdv.chooser = Honest
-   then (Memory.honest_next_virt_addr = 2 /\
-         Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-         Memory.malicious_next_virt_addr = 0 /\
-         Memory.malicious_virt_map = empty)
-   else (Memory.malicious_next_virt_addr = 2 /\
-         Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-         Memory.honest_next_virt_addr = 0 /\
-         Memory.honest_virt_map = empty))).
+   then (oget Memory.next_virt_addr.[Honest] = 2 /\
+         oget Memory.virt_map.[Honest] = (empty.[0 <- 0]).[1 <- 1] /\
+         oget Memory.next_virt_addr.[Malicious] = 0 /\
+         oget Memory.virt_map.[Malicious] = empty)
+   else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+         oget Memory.virt_map.[Malicious] = (empty.[0 <- 0]).[1 <- 1] /\
+         oget Memory.next_virt_addr.[Honest] = 0 /\
+         oget Memory.virt_map.[Honest] = empty))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).from_adv.
 sp.
 match.
@@ -2348,12 +1918,13 @@ seq 1 :
    key_addr = 0 /\ gm_invar (glob Memory) /\
    Memory.next_key = 1 /\ Memory.next_phys_addr = 1 /\
    Memory.phys_map = empty.[0 <- Key 0] /\
-   Memory.honest_next_virt_addr = 1 /\
-   Memory.honest_virt_map = (empty.[0 <- 0]) /\
-   Memory.malicious_next_virt_addr = 0 /\
-   Memory.malicious_virt_map = empty).
+   oget Memory.next_virt_addr.[Honest] = 1 /\
+   oget Memory.virt_map.[Honest] = empty.[0 <- 0] /\
+   oget Memory.next_virt_addr.[Malicious] = 0 /\
+   oget Memory.virt_map.[Malicious] = empty).
 exlim (glob Memory) => gm.
-call (HonestMemory.party_memory_create_key gm); first auto.
+call (HonestMemory.party_memory_create_key gm).
+auto; progress [-delta]; smt(get_setE).
 exlim (glob Memory) => gm'.
 exlim choice0 => ch.
 call (HonestMemory.party_memory_create_cell gm' 0 ch).
@@ -2373,12 +1944,12 @@ seq 1 :
    key_addr = 0 /\ gm_invar (glob Memory) /\
    Memory.next_key = 1 /\ Memory.next_phys_addr = 1 /\
    Memory.phys_map = empty.[0 <- Key 0] /\
-   Memory.malicious_next_virt_addr = 1 /\
-   Memory.malicious_virt_map = (empty.[0 <- 0]) /\
-   Memory.honest_next_virt_addr = 0 /\
-   Memory.honest_virt_map = empty).
+   oget Memory.next_virt_addr.[Malicious] = 1 /\
+   oget Memory.virt_map.[Malicious] = empty.[0 <- 0] /\
+   oget Memory.next_virt_addr.[Honest] = 0 /\
+   oget Memory.virt_map.[Honest] = empty).
 exlim (glob Memory) => gm.
-call (MaliciousMemory.party_memory_create_key gm); first auto.
+call (MaliciousMemory.party_memory_create_key gm); first auto; smt(get_setE).
 exlim (glob Memory) => gm'.
 exlim choice0 => ch.
 call (MaliciousMemory.party_memory_create_cell gm' 0 ch).
@@ -2404,14 +1975,14 @@ seq 1 :
        .[0 <- Key 0]
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 0 /\
-          Memory.malicious_virt_map = empty)
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 0 /\
-          Memory.honest_virt_map = empty))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 0 /\
+          oget Memory.virt_map.[Malicious] = empty)
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 0 /\
+          oget Memory.virt_map.[Honest] = empty))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).from_adv.
 sp.
 match.
@@ -2447,14 +2018,14 @@ seq 1 :
        .[0 <- Key 0]
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 1 /\
-          Memory.malicious_virt_map = empty.[0 <- 1])
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 1 /\
-          Memory.honest_virt_map = empty.[0 <- 1]))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 1 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 1])
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 1 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 1]))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).queue.
 sp.
 match.
@@ -2496,14 +2067,14 @@ seq 1 :
        .[0 <- Key 0]
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 1 /\
-          Memory.malicious_virt_map = empty.[0 <- 1])
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 1 /\
-          Memory.honest_virt_map = empty.[0 <- 1]))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 1 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 1])
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 1 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 1]))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).deliver.
 sp.
 match.
@@ -2549,14 +2120,14 @@ seq 1 :
        .[0 <- Key 0]
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 1 /\
-          Memory.malicious_virt_map = empty.[0 <- 1])
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 1 /\
-          Memory.honest_virt_map = empty.[0 <- 1]))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 1 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 1])
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 1 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 1]))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).queue.
 sp.
 match.
@@ -2592,14 +2163,14 @@ seq 1 :
        .[0 <- Key 0]
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 1 /\
-          Memory.malicious_virt_map = empty.[0 <- 1])
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 1 /\
-          Memory.honest_virt_map = empty.[0 <- 1]))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 1 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 1])
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 1 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 1]))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).deliver.
 sp.
 match.
@@ -2639,14 +2210,14 @@ seq 1 :
        .[0 <- Key 0]
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = empty.[0 <- 1].[1 <- 0])
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = empty.[0 <- 1].[1 <- 0]))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 1].[1 <- 0])
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 1].[1 <- 0]))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).queue.
 sp.
 match.
@@ -2687,14 +2258,14 @@ seq 1 :
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}]
        .[2 <- Cell {|key = 0; cont = choice; locked = false|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 3 /\
-          Memory.malicious_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2])
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 3 /\
-          Memory.honest_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2]))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 3 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 1].[1 <- 0].[2 <- 2])
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 3 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 1].[1 <- 0].[2 <- 2]))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).deliver.
 sp.
 match.
@@ -2721,13 +2292,13 @@ seq 1 :
        .[0 <- Key 0]
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}]
        .[2 <- Cell {|key = 0; cont = choice; locked = false|}] /\
-    (Memory.malicious_next_virt_addr = 2 /\
-     Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-     Memory.honest_next_virt_addr = 3 /\
-     Memory.honest_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2])).
+    (oget Memory.next_virt_addr.[Malicious] = 2 /\
+     oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+     oget Memory.next_virt_addr.[Honest] = 3 /\
+     oget Memory.virt_map.[Honest] = empty.[0 <- 1].[1 <- 0].[2 <- 2])).
 exlim (glob Memory) => gm.
 call (HonestMemory.party_memory_unlock_cell gm 0 1).
-auto; smt(mem_set get_setE).
+auto; smt(mem_set get_setE oget_some).
 match Some 1; first auto; smt().
 wp.
 exlim (glob Memory) => gm.
@@ -2757,10 +2328,10 @@ seq 1 :
        .[0 <- Key 0]
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}]
        .[2 <- Cell {|key = 0; cont = choice; locked = false|}] /\
-    (Memory.honest_next_virt_addr = 2 /\
-     Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-     Memory.malicious_next_virt_addr = 3 /\
-     Memory.malicious_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2])).
+    (oget Memory.next_virt_addr.[Honest] = 2 /\
+     oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+     oget Memory.next_virt_addr.[Malicious] = 3 /\
+     oget Memory.virt_map.[Malicious] = empty.[0 <- 1].[1 <- 0].[2 <- 2])).
 exlim (glob Memory) => gm.
 call (MaliciousMemory.party_memory_unlock_cell gm 0 1).
 auto; progress; smt(mem_set get_setE).
@@ -2794,14 +2365,14 @@ seq 1 :
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}]
        .[2 <- Cell {|key = 0; cont = choice; locked = false|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 3 /\
-          Memory.malicious_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2])
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 3 /\
-          Memory.honest_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2]))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 3 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 1].[1 <- 0].[2 <- 2])
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 3 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 1].[1 <- 0].[2 <- 2]))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).to_adv.
 sp.
 match.
@@ -2838,14 +2409,14 @@ seq 1 :
        .[1 <- Cell {|key = 0; cont = choice; locked = true|}]
        .[2 <- Cell {|key = 0; cont = choice; locked = false|}] /\
    (if CorrectAdv.chooser = Honest
-    then (Memory.honest_next_virt_addr = 2 /\
-          Memory.honest_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.malicious_next_virt_addr = 3 /\
-          Memory.malicious_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2])
-    else (Memory.malicious_next_virt_addr = 2 /\
-          Memory.malicious_virt_map = (empty.[0 <- 0]).[1 <- 1] /\
-          Memory.honest_next_virt_addr = 3 /\
-          Memory.honest_virt_map = empty.[0 <- 1].[1 <- 0].[2 <- 2]))).
+    then (oget Memory.next_virt_addr.[Honest] = 2 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Malicious] = 3 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 1].[1 <- 0].[2 <- 2])
+    else (oget Memory.next_virt_addr.[Malicious] = 2 /\
+          oget Memory.virt_map.[Malicious] = empty.[0 <- 0].[1 <- 1] /\
+          oget Memory.next_virt_addr.[Honest] = 3 /\
+          oget Memory.virt_map.[Honest] = empty.[0 <- 1].[1 <- 0].[2 <- 2]))).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).to_adv.
 sp.
 match.
@@ -2891,13 +2462,10 @@ seq 1 :
       then OtherHonest.HPS_Guesser_WaitFromAdvGuess
       else OtherHonest.HPS_Chooser_WaitFromAdvChoice) /\
    gm_invar (glob Memory) /\
-   Memory.next_key                 = 0 /\
-   Memory.next_phys_addr           = 0 /\
-   Memory.phys_map                 = empty /\
-   Memory.honest_next_virt_addr    = 0 /\
-   Memory.honest_virt_map          = empty /\
-   Memory.malicious_next_virt_addr = 0 /\
-   Memory.malicious_virt_map       = empty).
+   Memory.next_key = 0 /\ Memory.next_phys_addr = 0 /\
+   Memory.phys_map = empty /\
+   Memory.next_virt_addr = empty.[Honest <- 0].[Malicious <- 0] /\
+   Memory.virt_map       = empty.[Honest <- empty].[Malicious <- empty]).
 inline RealProtocol(Honest.Honest, OtherHonest.Honest).init.
 call memory_init.
 sp.
@@ -3408,9 +2976,10 @@ qed.
 op gm_invar_guesser
    (gm : gm, cell_hon_virt_addr cell_phys_addr : addr, cont : bool) : bool =
   exists (key : key, locked : bool),
-  (gm_to_honest_virt_map gm).[cell_hon_virt_addr] = Some cell_phys_addr /\
+  (oget (gm_to_virt_map gm).[Honest]).[cell_hon_virt_addr] =
+  Some cell_phys_addr /\
   (gm_to_phys_map gm).[cell_phys_addr] =
-    Some (Cell {|key = key; cont = cont; locked = locked|}).
+  Some (Cell {|key = key; cont = cont; locked = locked|}).
 
 lemma malic_trans_virt_addr_gm_invar_guesser_equiv
       (cell_hon_virt_addr cell_phys_addr : addr, cont : bool) :
@@ -3436,14 +3005,13 @@ conseq
    cont)
   (_ : true ==> true) => //.
 proc; inline*; sp 2.
-rcondf 1; first auto.
 if.
 auto; progress.
 rewrite /gm_invar_guesser /gm_to_honest_virt_map /gm_to_phys_map /=.
 rewrite /gm_invar_guesser in H0.
 elim H0 => key locked H0.
 exists key locked.
-smt(get_setE).
+smt(get_setE oget_some).
 auto.
 apply malic_trans_virt_addr_gm_invar_equiv.
 qed.
@@ -3783,28 +3351,30 @@ qed.
 op gm_rel_invar_chooser
    (gm1 gm2 : gm, cell_hon_virt_addr cell_phys_addr : addr, key : key,
     cont : bool) : bool =
-  gm_to_next_key gm1                 = gm_to_next_key gm2                 /\
-  gm_to_next_phys_addr gm1           = gm_to_next_phys_addr gm2           /\
-  gm_to_honest_next_virt_addr gm1    = gm_to_honest_next_virt_addr gm2    /\
-  gm_to_honest_virt_map gm1          = gm_to_honest_virt_map gm2          /\
-  gm_to_malicious_next_virt_addr gm1 = gm_to_malicious_next_virt_addr gm2 /\
-  gm_to_malicious_virt_map gm1       = gm_to_malicious_virt_map gm2       /\
-  (* *)
-  fdom (gm_to_phys_map gm1) = fdom (gm_to_phys_map gm2)                   /\
-  (gm_to_honest_virt_map gm1).[cell_hon_virt_addr] = Some cell_phys_addr  /\
-  (gm_to_phys_map gm1).[cell_phys_addr] =
-  Some (Cell {|key = key; cont = cont; locked = true|})                   /\
-  (gm_to_phys_map gm2).[cell_phys_addr] =
-  Some (Cell {|key = key; cont = true; locked = true|})                   /\
-  (* *)
+  gm_to_next_key gm1        = gm_to_next_key gm2              /\
+  gm_to_next_phys_addr gm1  = gm_to_next_phys_addr gm2        /\
+  gm_to_next_virt_addr gm1  = gm_to_next_virt_addr gm2        /\
+  gm_to_virt_map gm1        = gm_to_virt_map gm2              /\
+  fdom (gm_to_phys_map gm1) = fdom (gm_to_phys_map gm2)       /\
   (forall (phys_addr' : addr),
-   phys_addr' \in gm_to_phys_map gm1 => phys_addr' <> cell_phys_addr =>
+   phys_addr' \in gm_to_phys_map gm1 =>
+   phys_addr' <> cell_phys_addr =>
    (gm_to_phys_map gm1).[phys_addr'] =
-   (gm_to_phys_map gm2).[phys_addr'])                                     /\
+   (gm_to_phys_map gm2).[phys_addr'])                         /\
+  (* *)
+  (oget (gm_to_virt_map gm1).[Honest])
+    .[cell_hon_virt_addr] = Some cell_phys_addr               /\
+  (gm_to_phys_map gm1).[cell_phys_addr] =
+  Some (Cell {|key = key; cont = cont; locked = true|})       /\
+  (gm_to_phys_map gm2).[cell_phys_addr] =
+  Some (Cell {|key = key; cont = true; locked = true|})       /\
+  (* *)
   (forall (mal_virt_addr : addr),
-   mal_virt_addr \in gm_to_malicious_virt_map gm1 =>
+   mal_virt_addr \in oget (gm_to_virt_map gm1).[Malicious] =>
    let phys_addr' =
-     oget (gm_to_malicious_virt_map gm1).[mal_virt_addr] in
+     oget
+     (oget (gm_to_virt_map gm1).[Malicious])
+       .[mal_virt_addr] in
    oget (gm_to_phys_map gm1).[phys_addr'] <> Key key).
 
 lemma gm_rel_invar_chooser_malic_key_not_accessible_gm2
@@ -3813,10 +3383,12 @@ lemma gm_rel_invar_chooser_malic_key_not_accessible_gm2
   gm_invar gm1 =>
   gm_rel_invar_chooser gm1 gm2 cell_hon_virt_addr cell_phys_addr key cont =>
   (forall (mal_virt_addr : addr),
-   mal_virt_addr \in gm_to_malicious_virt_map gm2 =>
+   mal_virt_addr \in oget (gm_to_virt_map gm2).[Malicious] =>
    let phys_addr' =
-     oget (gm_to_malicious_virt_map gm2).[mal_virt_addr] in
-   oget (gm_to_phys_map gm2).[phys_addr'] <> Key key).
+     oget
+     (oget (gm_to_virt_map gm2).[Malicious])
+       .[mal_virt_addr] in
+   oget (gm_to_phys_map gm1).[phys_addr'] <> Key key).
 proof. smt(). qed.
 
 lemma malic_trans_virt_addr_gm_rel_invar_chooser_equiv
@@ -3847,12 +3419,7 @@ conseq
 apply MaliciousMemory.party_memory_trans_virt_addr_gm_invar.
 apply MaliciousMemory.party_memory_trans_virt_addr_gm_invar.
 proc; inline*; sp 2 2.
-if => //.
-auto.
-if => //.
-auto; progress; smt(get_setE).
-auto; progress; smt(get_setE).
-auto.
+(if; first smt()); auto; progress; smt(get_setE oget_some).
 qed.
 
 lemma malic_create_key_gm_rel_invar_chooser_equiv
@@ -3910,7 +3477,7 @@ conseq
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
 apply MaliciousMemory.party_memory_is_key_gm_invar.
 apply MaliciousMemory.party_memory_is_key_gm_invar.
-proc; inline*; auto; smt().
+proc; inline*; auto; smt(mem_fdom).
 qed.
 
 lemma malic_create_cell_gm_rel_invar_chooser_equiv
@@ -3941,14 +3508,10 @@ conseq
 apply MaliciousMemory.party_memory_create_cell_gm_invar.
 apply MaliciousMemory.party_memory_create_cell_gm_invar.
 proc; inline*; sp 3 3.
-if => //.
-if => //.
-auto.
-auto.
 if; first smt().
-match; first 2 smt().
+match; first 2 smt(mem_fdom).
 move => key1 key2.
-auto; smt(get_setE fdom_set).
+auto; progress; smt(get_setE fdom_set mem_fdom).
 move => cell1 cell2.
 auto.
 auto.
@@ -3981,7 +3544,7 @@ conseq
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
 apply MaliciousMemory.party_memory_is_cell_gm_invar.
 apply MaliciousMemory.party_memory_is_cell_gm_invar.
-proc; inline*; auto; smt().
+proc; inline*; auto; smt(mem_fdom).
 qed.
 
 lemma malic_unlock_cell_gm_rel_invar_chooser_equiv
@@ -4012,31 +3575,23 @@ conseq
 apply MaliciousMemory.party_memory_unlock_cell_gm_invar.
 apply MaliciousMemory.party_memory_unlock_cell_gm_invar.
 proc; inline*; sp 3 3.
-if => //.
-auto.
 if; first smt().
 sp 2 2.
-if; first smt().
+if; first smt(mem_fdom).
 sp 2 2.
-if; first smt().
-auto; progress; first 7 smt().
-smt(get_setE fdom_set).
-smt().
-smt(get_setE fdom_set).
-smt(get_setE fdom_set).
+if; first smt(mem_fdom).
+(auto; progress; first 6 smt(get_setE fdom_set mem_fdom fdomP));
+  last 4 smt(get_setE fdom_set mem_fdom fdomP).
 rewrite /gm_to_phys_map /=.
 case (phys_addr' = Memory.next_phys_addr{1}) => [eq_pa'_npa | neq_pa'_npa].
 rewrite 2!get_setE eq_pa'_npa.
 have -> // : Memory.next_phys_addr{2} = Memory.next_phys_addr{1}.
-smt(). smt().
+smt(). smt(mem_fdom).
 rewrite 2!get_setE.
 have -> /= : Memory.next_phys_addr{2} = Memory.next_phys_addr{1}.
 smt().
 rewrite neq_pa'_npa /=; smt(fdomP).
-smt(get_setE).
-auto.
-auto.
-auto.
+auto. auto. auto.
 qed.
 
 lemma malic_contents_cell_gm_rel_invar_chooser_equiv
@@ -4066,7 +3621,7 @@ conseq
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory)) => //.
 apply MaliciousMemory.party_memory_contents_cell_gm_invar.
 apply MaliciousMemory.party_memory_contents_cell_gm_invar.
-proc; inline*; auto; smt().
+proc; inline*; auto; smt(mem_fdom).
 qed.
 
 lemma malicious_party_gm_rel_invar_chooser_from_adv
@@ -4292,9 +3847,7 @@ apply HonestMemory.party_memory_trans_virt_addr_gm_invar.
 proc; inline*; sp 2 2.
 rcondt{1} 1; first auto; smt().
 rcondt{2} 1; first auto; smt().
-if; first smt().
 auto; smt(get_setE).
-auto.
 qed.
 
 (* extra procedures for honest party of simulator *)
@@ -4317,8 +3870,8 @@ module ExtraHonestMemorySim : EXTRA_HONEST_MEMORY_SIM = {
   proc modify_cell(cell_addr : addr, b : bool) : unit = {
     var r : bool; var phys_addr, virt_addr : addr;
     var obj_cell; var new_cell : cell;
-    if (cell_addr \in Memory.honest_virt_map) {
-      phys_addr <- oget Memory.honest_virt_map.[cell_addr];
+    if (cell_addr \in oget Memory.virt_map.[Honest]) {
+      phys_addr <- oget (oget Memory.virt_map.[Honest]).[cell_addr];
       obj_cell <- oget Memory.phys_map.[phys_addr];
       match obj_cell with
       | Key _     => { }
@@ -4333,8 +3886,8 @@ module ExtraHonestMemorySim : EXTRA_HONEST_MEMORY_SIM = {
   proc read_cell(cell_addr : addr) : bool option = {
     var r : bool option;  var phys_addr, virt_addr : addr;
     var obj_cell; var cell : cell;
-    if (cell_addr \in Memory.honest_virt_map) {
-      phys_addr <- oget Memory.honest_virt_map.[cell_addr];
+    if (cell_addr \in oget Memory.virt_map.[Honest]) {
+      phys_addr <- oget (oget Memory.virt_map.[Honest]).[cell_addr];
       obj_cell <- oget Memory.phys_map.[phys_addr];
       match obj_cell with
       | Key _     => { r <- None; }
@@ -4361,10 +3914,10 @@ proc => /=.
 if.
 sp.
 match Cell 1; first auto; smt().
-auto; progress; (apply gm_eqP; first 2 smt()); last 4 smt().
+(auto; progress; apply gm_eqP; first 2 smt()); last 2 smt().
 rewrite /gm_to_phys_map /=.
 have -> :
-  oget Memory.honest_virt_map{hr}.[cell_addr{hr}] =
+  oget (oget Memory.virt_map{hr}.[Honest]).[cell_addr{hr}] =
   cell_phys_addr by smt().
 have doms_eq :
   fdom (gm_to_phys_map gm1) = fdom Memory.phys_map{hr} by smt().
@@ -4392,7 +3945,6 @@ lemma is_cell_read_cell_good (gm : gm, cell_addr' : addr) :
    res{2} = Some ((cell_addr_to_cell Honest gm cell_addr').`cont)].
 proof.
 proc; inline*; sp 2 0.
-rcondt{1} 1; first auto.
 if => //; auto; smt().
 qed.
 
@@ -4406,7 +3958,6 @@ lemma is_cell_read_cell_bad (gm : gm, cell_addr' : addr) :
    ! res{1} /\ res{2} = None].
 proof.
 proc; inline*; sp 2 0.
-rcondt{1} 1; first auto.
 if => //; auto; smt().
 qed.
 
@@ -4420,7 +3971,8 @@ lemma real_simulator_unlock_cell_gm_invar_guesser
    ={res, glob Memory} /\ gm_invar (glob Memory){1} /\
    (res{1} <> None =>
     (exists (phys_addr : addr, cell : cell),
-    (gm_to_honest_virt_map (glob Memory){1}).[oget res{1}] = Some phys_addr /\
+    (oget (gm_to_virt_map (glob Memory){1}).[Honest]).[oget res{1}] =
+    Some phys_addr /\
     (gm_to_phys_map (glob Memory){1}).[phys_addr] = Some (Cell cell) /\
     cell.`cont = cont /\ cell.`locked = false))].
 proof.
@@ -4430,26 +3982,24 @@ conseq
    ={res, glob Memory} /\
    (res{1} <> None =>
     (exists (phys_addr : addr, cell : cell),
-    (gm_to_honest_virt_map (glob Memory){1}).[oget res{1}] = Some phys_addr /\
+    (oget (gm_to_virt_map (glob Memory){1}).[Honest]).[oget res{1}] =
+    Some phys_addr /\
     (gm_to_phys_map (glob Memory){1}).[phys_addr] = Some (Cell cell) /\
     cell.`cont = cont /\ cell.`locked = false)))
   (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
   (_ : _ ==> _) => //.
 apply HonestMemory.party_memory_unlock_cell_gm_invar.
 proc; inline *; sp 3 3.
-rcondt{1} 1; first auto.
-rcondt{2} 1; first auto.
 if => //.
 sp 2 2.
 if => //.
 sp 2 2.
 if => //.
 auto => &1 &2 |>.
-rewrite /gm_to_honest_virt_map /gm_to_phys_map /= get_set_sameE.
+rewrite /gm_to_virt_map /gm_to_phys_map /= get_set_sameE oget_some.
+rewrite get_set_sameE /=.
 smt(get_setE).
-auto.
-auto.
-auto.
+auto. auto. auto.
 qed.
 
 type sim_honest_party_state = [
@@ -5090,22 +4640,24 @@ seq 1 1 :
    Memory.phys_map{1} =
    (gm_to_phys_map gm)
      .[gm_to_next_phys_addr gm <- Key (gm_to_next_key gm)] /\
-   Memory.honest_next_virt_addr{1} =
-   gm_to_honest_next_virt_addr gm + 1 /\
-   Memory.honest_virt_map{1} =
-   (gm_to_honest_virt_map gm)
-      .[gm_to_honest_next_virt_addr gm <- gm_to_next_phys_addr gm] /\
-   key_addr{1} = gm_to_honest_next_virt_addr gm /\
-   Memory.malicious_next_virt_addr{1} = gm_to_malicious_next_virt_addr gm /\
-   Memory.malicious_virt_map{1} = gm_to_malicious_virt_map gm /\
+   oget Memory.next_virt_addr.[Honest]{1} =
+   oget (gm_to_next_virt_addr gm).[Honest] + 1 /\
+   oget Memory.virt_map{1}.[Honest] =
+   (oget (gm_to_virt_map gm).[Honest])
+     .[oget (gm_to_next_virt_addr gm).[Honest] <- gm_to_next_phys_addr gm] /\
+   key_addr{1} = oget (gm_to_next_virt_addr gm).[Honest] /\
+   Memory.next_virt_addr{1}.[Malicious] =
+   (gm_to_next_virt_addr gm).[Malicious] /\
+   Memory.virt_map{1}.[Malicious] = (gm_to_virt_map gm).[Malicious] /\
    (forall (mal_virt_addr : addr),
-    mal_virt_addr \in gm_to_malicious_virt_map gm =>
+    mal_virt_addr \in oget (gm_to_virt_map gm).[Malicious] =>
     let phys_addr' =
-      oget (gm_to_malicious_virt_map gm).[mal_virt_addr] in
+      oget (oget (gm_to_virt_map gm).[Malicious]).[mal_virt_addr] in
     oget Memory.phys_map{1}.[phys_addr'] <> Key (gm_to_next_key gm))).
 call{1} (HonestMemory.party_memory_create_key_phl gm).
 call{2} (HonestMemory.party_memory_create_key_phl gm).
-auto; smt(gm_invar_old_mal_virt_addr_does_not_give_new_key).
+auto;
+  smt(fmap_eqP mem_fdom fdomP gm_invar_old_virt_addr_does_not_give_new_key).
 exlim (glob Memory){1}, key_addr{1}, choice{1} => gm' key_addr' choice'.
 call{1} (HonestMemory.party_memory_create_cell_phl gm' key_addr' choice').
 call{2} (HonestMemory.party_memory_create_cell_phl gm' key_addr' true).
@@ -5113,9 +4665,10 @@ auto; progress [-delta].
 smt(get_setE).
 apply
   (RI_Chooser_WaitCellAddrToOther _ _ _ _ _ choice{2}
-   (gm_to_honest_next_virt_addr gm) (gm_to_honest_next_virt_addr gm + 1)
+   (oget (gm_to_next_virt_addr gm).[Honest])
+   (oget (gm_to_next_virt_addr gm).[Honest] + 1)
    (gm_to_next_phys_addr gm + 1) (gm_to_next_key gm)).
-smt(fdom_set get_setE).
+progress; smt(get_setE fdom_set fmap_eqP mem_fdom fdomP).
 wp.
 ((match => //; first auto; smt(RI_Chooser_WaitChoiceFromAdv));
   first auto; exfalso; smt());
@@ -5255,7 +4808,7 @@ rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
    choice key_addr guess) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
    choice key_addr guess) /#.
@@ -5276,7 +4829,7 @@ match IPS_Chooser_WaitToAdvResult {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result) /#.
 (* ri_chooser_wait_error_to_adv *)
 move => invar_ri_chooser_wait_error_to_adv.
@@ -5295,7 +4848,7 @@ match IPS_Chooser_WaitToAdvError {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite RI_Chooser_WaitErrorToAdv /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Chooser_WaitErrorToAdv /#.
 (* ri_chooser_final *)
 move => invar_ri_chooser_final.
@@ -5314,7 +4867,7 @@ match IPS_Chooser_Final {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite RI_Chooser_Final /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Chooser_Final /#.
 (* ri_guesser_wait_guess_from_adv *)
 move => invar_ri_guesser_wait_guess_from_adv.
@@ -5345,7 +4898,7 @@ exfalso; smt().
 auto; progress [-delta].
 rewrite (RI_Guesser_WaitGuessFromAdv _ _ _ _ _) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_WaitGuessFromAdv _ _ _ _ _) /#.
 (* ri_guesser_wait_cell_addr_from_other *)
 move => guess invar_ri_guesser_wait_cell_addr_from_other.
@@ -5365,7 +4918,7 @@ match IPS_Guesser_WaitSimChoice {2} 1; first auto; smt().
 auto; progress [-delta].
 rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess) /#.
 (* ri_guesser_wait_guess_to_other *)
 move =>
@@ -5392,7 +4945,7 @@ rewrite
 call
   (malicious_party_gm_invar_guesser_from_adv
    cell_addr cell_phys_addr cont Malicious).
-auto; progress [-delta]; first 9 smt().
+auto; progress [-delta]; first 7 smt().
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
    guess cell_addr cell_phys_addr cont result) /#.
@@ -5421,7 +4974,7 @@ rewrite
 call
   (malicious_party_gm_invar_guesser_from_adv
    cell_addr cell_phys_addr cont Malicious).
-auto; progress [-delta]; first 9 smt().
+auto; progress [-delta]; first 7 smt().
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
    guess cell_addr cell_phys_addr cont result) /#.
@@ -5443,7 +4996,7 @@ match IPS_Guesser_WaitToAdvResult {2} 1; first auto; smt().
 auto; progress [-delta].
 rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result) /#.
 (* ri_guesser_wait_error_to_adv *)
 move => invar_ri_guesser_wait_error_to_adv.
@@ -5463,7 +5016,7 @@ match IPS_Guesser_WaitToAdvError {2} 1; first auto; smt().
 auto; progress [-delta].
 rewrite (RI_Guesser_WaitErrorToAdv _ _ _ _ _) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_WaitErrorToAdv _ _ _ _ _) /#.
 (* ri_guesser_final *)
 move => invar_ri_guesser_final.
@@ -5483,7 +5036,7 @@ match IPS_Guesser_Final {2} 1; first auto; smt().
 auto; progress [-delta].
 rewrite (RI_Guesser_Final _ _ _ _ _) /#.
 call (malicious_party_gm_invar_from_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_Final _ _ _ _ _) /#.
 qed.
 
@@ -5524,7 +5077,7 @@ match IPS_Chooser_WaitFromAdvChoice {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite RI_Chooser_WaitChoiceFromAdv /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Chooser_WaitChoiceFromAdv /#.
 (* ri_chooser_wait_cell_addr_to_other *)
 move => choice key_addr cell_addr cell_phys_addr key
@@ -5658,7 +5211,7 @@ rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
    choice key_addr guess) /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
    choice key_addr guess) /#.
@@ -5679,7 +5232,7 @@ match IPS_Chooser_WaitToAdvResult {2} 2; first auto; smt().
 auto; progress [-delta]; first smt().
 rewrite RI_Chooser_Final /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result) /#.
 (* ri_chooser_wait_error_to_adv *)
 move => invar_ri_chooser_wait_error_to_adv.
@@ -5698,7 +5251,7 @@ match IPS_Chooser_WaitToAdvError {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite RI_Chooser_Final /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Chooser_WaitErrorToAdv _ _ _ _ _) /#.
 (* ri_chooser_final *)
 move => invar_ri_chooser_final.
@@ -5717,7 +5270,7 @@ match IPS_Chooser_Final {2} 2; first auto; smt().
 auto; progress [-delta].
 by rewrite RI_Chooser_Final.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Chooser_Final /#.
 (* ri_guesser_wait_guess_from_adv *)
 move => invar_ri_guesser_wait_guess_from_adv.
@@ -5736,7 +5289,7 @@ match IPS_Guesser_WaitFromAdvGuess {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite RI_Guesser_WaitGuessFromAdv /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Guesser_WaitGuessFromAdv /#.
 (* ri_guesser_wait_cell_addr_from_other *)
 move => guess invar_ri_guesser_wait_cell_addr_from_other.
@@ -5755,7 +5308,7 @@ match IPS_Guesser_WaitSimChoice {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess) /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess) /#.
 (* ri_guesser_wait_guess_to_other *)
 move =>
@@ -5781,7 +5334,7 @@ rewrite
 call
   (malicious_party_gm_invar_guesser_to_adv
    cell_addr cell_phys_addr cont Malicious).
-auto; progress [-delta]; first 9 smt().
+auto; progress [-delta]; first 7 smt().
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
    guess cell_addr cell_phys_addr cont result) /#.
@@ -5809,7 +5362,7 @@ rewrite
 call
   (malicious_party_gm_invar_guesser_to_adv
    cell_addr cell_phys_addr cont Malicious).
-auto; progress [-delta]; first 9 smt().
+auto; progress [-delta]; first 7 smt().
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
    guess cell_addr cell_phys_addr cont result) /#.
@@ -5830,7 +5383,7 @@ match IPS_Guesser_WaitToAdvResult {2} 2; first auto; smt().
 auto; progress [-delta]; first smt().
 rewrite RI_Guesser_Final /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result) /#.
 (* ri_guesser_wait_error_to_adv *)
 move => invar_ri_guesser_wait_error_to_adv.
@@ -5849,7 +5402,7 @@ match IPS_Guesser_WaitToAdvError {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite (RI_Guesser_Final _ _ _ _ _) /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Guesser_WaitErrorToAdv /#.
 (* ri_guesser_final *)
 move => invar_ri_guesser_final.
@@ -5868,7 +5421,7 @@ match IPS_Guesser_Final {2} 2; first auto; smt().
 auto; progress [-delta].
 rewrite RI_Guesser_Final /#.
 call (malicious_party_gm_invar_to_adv Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Guesser_Final /#.
 qed.
 
@@ -5916,7 +5469,7 @@ by rewrite RI_Chooser_WaitChoiceFromAdv.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Chooser_WaitChoiceFromAdv /#.
 (* ri_chooser_wait_cell_addr_to_other *)
 move => choice' key_addr' cell_addr' cell_phys_addr' key'
@@ -6096,7 +5649,7 @@ rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result{2}) /#.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
    choice' key_addr' guess') /#.
@@ -6121,7 +5674,7 @@ rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
 (* ri_chooser_wait_error_to_adv *)
 move => invar_ri_chooser_wait_error_to_adv.
@@ -6144,7 +5697,7 @@ rewrite RI_Chooser_WaitErrorToAdv /#.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Chooser_WaitErrorToAdv _ _ _ _ _) /#.
 (* ri_chooser_final *)
 move => invar_ri_chooser_final.
@@ -6168,7 +5721,7 @@ by rewrite RI_Chooser_Final.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Chooser_Final /#.
 (* ri_guesser_wait_guess_from_adv *)
 move => invar_ri_guesser_wait_guess_from_adv.
@@ -6192,7 +5745,7 @@ by rewrite RI_Guesser_WaitGuessFromAdv.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Guesser_WaitGuessFromAdv /#.
 (* ri_guesser_wait_cell_addr_from_other *)
 move => guess' invar_ri_guesser_wait_cell_addr_from_other.
@@ -6216,7 +5769,7 @@ rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
 (* ri_guesser_wait_guess_to_other *)
 move =>
@@ -6247,7 +5800,7 @@ wp.
 call
   (malicious_party_gm_invar_guesser_to_other cell_addr'
    cell_phys_addr' cont' Malicious).
-auto; progress [-delta]; first 9 smt().
+auto; progress [-delta]; first 7 smt().
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
    guess' cell_addr' cell_phys_addr' cont' result') /#.
@@ -6280,7 +5833,7 @@ wp.
 call
   (malicious_party_gm_invar_guesser_to_other cell_addr'
    cell_phys_addr' cont' Malicious).
-auto; progress [-delta]; first 9 smt().
+auto; progress [-delta]; first 7 smt().
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
    guess' cell_addr' cell_phys_addr' cont' result') /#.
@@ -6306,7 +5859,7 @@ rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
 (* ri_guesser_wait_error_to_adv *)
 move => invar_ri_guesser_wait_error_to_adv.
@@ -6330,7 +5883,7 @@ by rewrite RI_Guesser_WaitErrorToAdv.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Guesser_WaitErrorToAdv /#.
 (* ri_guesser_final *)
 move => invar_ri_guesser_final.
@@ -6354,7 +5907,7 @@ by rewrite RI_Guesser_Final.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite RI_Guesser_Final /#.
 qed.
 
@@ -6412,7 +5965,7 @@ by rewrite RI_Chooser_WaitChoiceFromAdv.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-(auto; progress [-delta]; first 8 smt());
+(auto; progress [-delta]; first 6 smt());
   rewrite RI_Chooser_WaitChoiceFromAdv /#.
 (* ri_chooser_wait_cell_addr_to_other *)
 move => choice' key_addr' cell_addr' cell_phys_addr' key'
@@ -6675,7 +6228,7 @@ rewrite
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-(auto; progress [-delta]; first 8 auto; smt());
+(auto; progress [-delta]; first 6 auto; smt());
   rewrite
     (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
      choice' key_addr' guess') /#.
@@ -6712,7 +6265,7 @@ rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-auto; progress [-delta]; first 8 auto; smt().
+auto; progress [-delta]; first 6 auto; smt().
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
 rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
 (* ri_chooser_wait_error_to_adv *)
@@ -6748,7 +6301,7 @@ by rewrite RI_Chooser_WaitErrorToAdv.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-auto; progress [-delta]; first 8 smt().
+auto; progress [-delta]; first 6 smt().
 rewrite (RI_Chooser_WaitErrorToAdv _ _ _ _ _) /#.
 rewrite (RI_Chooser_WaitErrorToAdv _ _ _ _ _) /#.
 (* ri_chooser_final *)
@@ -6784,7 +6337,7 @@ by rewrite RI_Chooser_Final.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-(auto; progress [-delta]; first 8 smt());
+(auto; progress [-delta]; first 6 smt());
   rewrite (RI_Chooser_Final _ _ _ _ _) /#.
 (* ri_guesser_wait_guess_from_adv *)
 move => invar_ri_guesser_wait_guess_from_adv.
@@ -6819,7 +6372,7 @@ by rewrite RI_Guesser_WaitGuessFromAdv.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-(auto; progress [-delta]; first 8 smt());
+(auto; progress [-delta]; first 6 smt());
   rewrite (RI_Guesser_WaitGuessFromAdv _ _ _ _ _) /#.
 (* ri_guesser_wait_cell_addr_from_other *)
 move => guess' invar_ri_guesser_wait_cell_addr_from_other.
@@ -6875,8 +6428,10 @@ auto; progress [-delta].
 pose cell := cell_addr_to_cell Honest (glob Memory){1} cell_addr{2}.
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
-   guess{1} cell_addr{2} (oget Memory.honest_virt_map{1}.[cell_addr{2}])
-   cell.`cont (guess{2} = cell.`cont)); smt(get_some).
+   guess{1} cell_addr{2}
+   (oget (oget Memory.virt_map{1}.[Honest]).[cell_addr{2}])
+   cell.`cont (guess{2} = cell.`cont)).
+progress; smt(get_some).
 seq 1 1 : (#pre /\ ! b0{1} /\ choice_opt{2} = None).
 exlim (glob Memory){1}, cell_addr{1} => gm cell_addr'.
 call (is_cell_read_cell_bad gm cell_addr').
@@ -6905,7 +6460,7 @@ rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-(auto; progress [-delta]; first 8 smt());
+(auto; progress [-delta]; first 6 smt());
   rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
 (* ri_guesser_wait_guess_to_other *)
 move =>
@@ -6951,7 +6506,7 @@ wp.
 call
   (malicious_party_gm_invar_guesser_from_other
    cell_addr' cell_phys_addr' cont' Malicious).
-(auto; progress [-delta]; first 9 smt());
+(auto; progress [-delta]; first 7 smt());
   rewrite
     (RI_Guesser_WaitGuessToOther _ _ _ _ _
      guess' cell_addr' cell_phys_addr' cont' result') /#.
@@ -6998,8 +6553,8 @@ seq 1 1 :
    result' = (guess' = cont') /\
    (unlocked_cell_addr_opt{1} <> None =>
     (exists (phys_addr : addr, cell : cell),
-    (gm_to_honest_virt_map
-     (glob Memory){1}).[oget unlocked_cell_addr_opt{1}] = Some phys_addr /\
+     (oget (gm_to_virt_map (glob Memory){1}).[Honest])
+        .[oget unlocked_cell_addr_opt{1}] = Some phys_addr /\
     (gm_to_phys_map (glob Memory){1}).[phys_addr] = Some (Cell cell) /\
     cell.`cont = cont' /\ cell.`locked = false))).
 call
@@ -7052,7 +6607,7 @@ wp.
 call
   (malicious_party_gm_invar_guesser_from_other
    cell_addr' cell_phys_addr' cont' Malicious).
-(auto; progress [-delta]; first 9 smt());
+(auto; progress [-delta]; first 7 smt());
   rewrite
     (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
      guess' cell_addr' cell_phys_addr' cont' result') /#.
@@ -7087,7 +6642,7 @@ rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-(auto; progress [-delta]; first 8 smt());
+(auto; progress [-delta]; first 6 smt());
   rewrite (RI_Guesser_WaitResultToAdv _ _ _ _ _ result') /#.
 (* ri_guesser_wait_error_to_adv *)
 move => invar_ri_guesser_wait_error_to_adv.
@@ -7120,7 +6675,7 @@ by rewrite RI_Guesser_WaitErrorToAdv.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-(auto; progress [-delta]; first 8 smt());
+(auto; progress [-delta]; first 6 smt());
   rewrite (RI_Guesser_WaitErrorToAdv _ _ _ _ _) /#.
 (* ri_guesser_final *)
 move => invar_ri_guesser_final.
@@ -7153,7 +6708,7 @@ by rewrite RI_Guesser_Final.
 move => msg1 msgs1 msg2 msgs2.
 wp.
 call (malicious_party_gm_invar_from_other Malicious).
-(auto; progress [-delta]; first 8 smt());
+(auto; progress [-delta]; first 6 smt());
   rewrite (RI_Guesser_Final _ _ _ _ _) /#.
 qed.
 
@@ -7211,8 +6766,9 @@ qed.
 
 end section.
 
-(* we have perfect security: the adversary has no chance of
-   distinguishing the real and ideal worlds
+(* we have perfect security: the probability that Adv returns true in
+   the real experiment is exactly the same as the probability it
+   returns true in the ideal experiment
 
    assuming we resrict ourselves to Malicious and Adv being
    non-probabilistic, we can conclude that the real experiment results
