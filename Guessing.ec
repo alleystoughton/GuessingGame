@@ -794,7 +794,7 @@ lemma memory_unlock_cell (gm : gm , pty' : party, cell_addr' key_addr' : addr) :
    oget Memory.virt_map.[pty'] =
    (oget (gm_to_virt_map gm).[pty'])
      .[oget (gm_to_next_virt_addr gm).[pty'] <- gm_to_next_phys_addr gm] /\
-   Memory.next_virt_addr.[other pty'] = 
+   Memory.next_virt_addr.[other pty'] =
    (gm_to_next_virt_addr gm).[other pty'] /\
    Memory.virt_map.[other pty'] =  (gm_to_virt_map gm).[other pty'] /\
    res = Some (oget (gm_to_next_virt_addr gm).[pty'])].
@@ -1345,7 +1345,7 @@ lemma party_memory_unlock_cell (gm : gm , cell_addr' key_addr' : addr) :
    oget Memory.virt_map.[party] =
    (oget (gm_to_virt_map gm).[party])
      .[oget (gm_to_next_virt_addr gm).[party] <- gm_to_next_phys_addr gm] /\
-   Memory.next_virt_addr.[other party] = 
+   Memory.next_virt_addr.[other party] =
    (gm_to_next_virt_addr gm).[other party] /\
    Memory.virt_map.[other party] =  (gm_to_virt_map gm).[other party] /\
    res = Some (oget (gm_to_next_virt_addr gm).[party])].
