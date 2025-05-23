@@ -21,6 +21,8 @@ prover ["Z3" "Alt-Ergo"].  (* both must succeed for all smt goals *)
 
 require import AllCore List FMap FSet.
 
+(********************************** Memories **********************************)
+
 (* party names
 
    the malicious party isn't necessarily dishonest *)
@@ -897,108 +899,9 @@ rcondf 1; auto; smt().
 auto.
 qed.
 
-(* messages *)
-
-type msg = [
-  | Result   of bool  (* did sending party win (true) or lose (false)? *)
-  | Choice   of bool  (* a choice *)
-  | Guess    of bool  (* a guess *)
-  | CellAddr of addr  (* the virtual address of a cell *)
-  | KeyAddr  of addr  (* the virtual address of a key *)
-  | Error             (* an error has occurred *)
-  | Int      of int   (* for other adversary/malicious party
-                         communication *)
-].
-
-(* two-party protocols
-
-   except for init, these procedures are called by the adversary,
-   specifying which party it relates to
-
-   in addition to the indicated action, they let the party make whatever
-   internal progress it wants
-
-   in practice, protocol parties communicate partly using memories *)
-
-module type PROTOCOL = {
-  (* initialize the protocol, saying which party will be the choooser
-     (the other party is then the guesser)  *)
-
-  proc init(chooser : party) : unit
-
-  (* ask the party to accept a message from the adversary; the boolean
-     says whether it was accepted *)
-
-  proc from_adv(party : party, msg : msg) : bool
-
-  (* ask the party if it wants to send a message to the adversary;
-     if None is returned, that means there is no message *)
-
-  proc to_adv(party : party) : msg option
-
-  (* allow the party to optionally enqueue a message intended for the
-     other party; the adversary can't tell if this happened *)
-
-  proc queue(party : party) : unit
-
-  (* allow the party to optionally dequeue a message queued for it;
-     the adversary can't tell if this happened *)
-
-  proc deliver(party : party) : unit
-}.
-
-(* an adversary is parameterized by a protocol
-
-   the protocol may use the memory, but the adversary has no direct
-   access to the memory (in the security proof, this is enforced by
-   module restrictions)
-
-   the adversary is the distinguisher, but also plays the roles
-   of the clients of both the honest and malicious parties
-
-   thus it "knows" both the choice and guess, giving us a strong
-   notion of security modeling the idea that one client may have
-   an idea what the other will choose or guess, or may have some
-   influence on the other party *)
-
-module type ADV (Proto : PROTOCOL) = {
-  (* initialization and select the party that will be the chooser,
-     with the other party being the guesser; this must be done without
-     interacting with the protocol *)
-
-  proc chooser() : party { }
-
-  (* experiment with the protocol, returning a boolean judgement;
-     may not initialize the protocl *)
-
-  proc distinguish() : bool
-         {Proto.from_adv, Proto.to_adv, Proto.queue, Proto.deliver}
-}.
-
-(* an experiment, connecting a protocol and adversary, and eventually
-   returning the adversary's boolean judgement *)
-
-module Exper (Prot : PROTOCOL, Adv : ADV) = {
-  (* connect the protocol to the adversary *)
-  module A = Adv(Prot)
-
-  proc main() : bool = {
-    var b : bool; var chooser : party;
-    (* let the adversary pick who the chooser is *)
-    chooser <@ A.chooser();
-    (* initialize the protocol, setting who the chooser is *)
-    Prot.init(chooser);
-    (* let the adversary experiment with protocol, terminating
-       with a boolean judgement, which is then returned as
-       the result of the experiement *)
-    b <@ A.distinguish();
-    return b;
-  }
-}.
-
-(* a party's interface to the memory; like the corresponding
-   functions of MEMORY, but where the party is implicit,
-   and initialization is not possible *)
+(* a party's interface to the memory; like the corresponding functions
+   of MEMORY, but where the party is implicit, and initialization is
+   not possible *)
 
 module type PARTY_MEMORY = {
   proc trans_virt_addr(addr : addr) : addr option
@@ -1399,6 +1302,107 @@ clone PartyMemory as MaliciousMemory with
   op party <- Malicious
 proof *.
 
+(********* Protocols, Adversaries, Experiments and the Real Protocol **********)
+
+(* protocol messages *)
+
+type msg = [
+  | Result   of bool  (* did sending party win (true) or lose (false)? *)
+  | Choice   of bool  (* a choice *)
+  | Guess    of bool  (* a guess *)
+  | CellAddr of addr  (* the virtual address of a cell *)
+  | KeyAddr  of addr  (* the virtual address of a key *)
+  | Error             (* an error has occurred *)
+  | Int      of int   (* for other adversary/malicious party
+                         communication *)
+].
+
+(* two-party protocols
+
+   except for init, these procedures are called by the adversary,
+   specifying which party it relates to
+
+   in addition to the indicated action, they let the party make whatever
+   internal progress it wants
+
+   in practice, protocol parties communicate partly using memories *)
+
+module type PROTOCOL = {
+  (* initialize the protocol, saying which party will be the choooser
+     (the other party is then the guesser)  *)
+
+  proc init(chooser : party) : unit
+
+  (* ask the party to accept a message from the adversary; the boolean
+     says whether it was accepted *)
+
+  proc from_adv(party : party, msg : msg) : bool
+
+  (* ask the party if it wants to send a message to the adversary;
+     if None is returned, that means there is no message *)
+
+  proc to_adv(party : party) : msg option
+
+  (* allow the party to optionally enqueue a message intended for the
+     other party; the adversary can't tell if this happened *)
+
+  proc queue(party : party) : unit
+
+  (* allow the party to optionally dequeue a message queued for it;
+     the adversary can't tell if this happened *)
+
+  proc deliver(party : party) : unit
+}.
+
+(* an adversary is parameterized by a protocol
+
+   the protocol may use the memory, but the adversary has no direct
+   access to the memory (in the security proof, this is enforced by
+   module restrictions)
+
+   the adversary is the distinguisher, but also plays the roles
+   of the clients of both the honest and malicious parties
+
+   thus it "knows" both the choice and guess, giving us a strong
+   notion of security modeling the idea that one client may have
+   an idea what the other will choose or guess, or may have some
+   influence on the other party *)
+
+module type ADV (Proto : PROTOCOL) = {
+  (* initialization and select the party that will be the chooser,
+     with the other party being the guesser; this must be done without
+     interacting with the protocol *)
+
+  proc chooser() : party { }
+
+  (* experiment with the protocol, returning a boolean judgement;
+     may not initialize the protocl *)
+
+  proc distinguish() : bool
+         {Proto.from_adv, Proto.to_adv, Proto.queue, Proto.deliver}
+}.
+
+(* an experiment, connecting a protocol and adversary, and eventually
+   returning the adversary's boolean judgement *)
+
+module Exper (Prot : PROTOCOL, Adv : ADV) = {
+  (* connect the protocol to the adversary *)
+  module A = Adv(Prot)
+
+  proc main() : bool = {
+    var b : bool; var chooser : party;
+    (* let the adversary pick who the chooser is *)
+    chooser <@ A.chooser();
+    (* initialize the protocol, setting who the chooser is *)
+    Prot.init(chooser);
+    (* let the adversary experiment with protocol, terminating
+       with a boolean judgement, which is then returned as
+       the result of the experiement *)
+    b <@ A.distinguish();
+    return b;
+  }
+}.
+
 (* a party is parameterized by its interface to the memory; module
    restrictions are used in the proof to enforce that it only
    accesses the memory in this way *)
@@ -1780,7 +1784,7 @@ clone Honest as OtherHonest.
 (********************************* Correctness ********************************)
 
 (* For correctness, we let both parties be Honest, and show that no
-   matter which roles we assign then (chooser/guesser) and whatever
+   matter which roles we assign them (chooser/guesser) and whatever
    choices/guesses we tell them to use (using from_adv), there is a
    sequence of calls to the queue and deliver procedures such that
    when to_adv is called for the chooser/guesser, the results
@@ -3794,7 +3798,7 @@ by conseq
     cell_hon_virt_addr cell_phys_addr key cont).
 qed.
 
-(* lemmas regarding the honest part of the simulator and its
+(* lemmas regarding the honest party of the simulator and its
    interface to the memory -- which provides greater access
    than the normal party memory (see the procedures defined
    below)
@@ -3850,6 +3854,47 @@ proc; inline*; sp 2 2.
 rcondt{1} 1; first auto; smt().
 rcondt{2} 1; first auto; smt().
 auto; smt(get_setE).
+qed.
+
+lemma real_simulator_unlock_cell_gm_invar_guesser
+      (cell_hon_virt_addr cell_phys_addr : addr, cont : bool) :
+  equiv
+  [HonestMemory.PartyMemory.unlock_cell ~ HonestMemory.PartyMemory.unlock_cell :
+   ={cell_addr, key_addr, glob Memory} /\ cell_addr{1} = cell_hon_virt_addr /\
+   gm_invar (glob Memory){1} /\
+   gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr cont ==>
+   ={res, glob Memory} /\ gm_invar (glob Memory){1} /\
+   (res{1} <> None =>
+    (exists (phys_addr : addr, cell : cell),
+    (oget (gm_to_virt_map (glob Memory){1}).[Honest]).[oget res{1}] =
+    Some phys_addr /\
+    (gm_to_phys_map (glob Memory){1}).[phys_addr] = Some (Cell cell) /\
+    cell.`cont = cont /\ cell.`locked = false))].
+proof.
+conseq
+  (_ :
+   _ ==>
+   ={res, glob Memory} /\
+   (res{1} <> None =>
+    (exists (phys_addr : addr, cell : cell),
+    (oget (gm_to_virt_map (glob Memory){1}).[Honest]).[oget res{1}] =
+    Some phys_addr /\
+    (gm_to_phys_map (glob Memory){1}).[phys_addr] = Some (Cell cell) /\
+    cell.`cont = cont /\ cell.`locked = false)))
+  (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
+  (_ : _ ==> _) => //.
+apply HonestMemory.party_memory_unlock_cell_gm_invar.
+proc; inline *; sp 3 3.
+if => //.
+sp 2 2.
+if => //.
+sp 2 2.
+if => //.
+auto => &1 &2 |>.
+rewrite /gm_to_virt_map /gm_to_phys_map /= get_set_sameE oget_some.
+rewrite get_set_sameE /=.
+smt(get_setE).
+auto. auto. auto.
 qed.
 
 (* extra procedures for honest party of simulator *)
@@ -3961,47 +4006,6 @@ lemma is_cell_read_cell_bad (gm : gm, cell_addr' : addr) :
 proof.
 proc; inline*; sp 2 0.
 if => //; auto; smt().
-qed.
-
-lemma real_simulator_unlock_cell_gm_invar_guesser
-      (cell_hon_virt_addr cell_phys_addr : addr, cont : bool) :
-  equiv
-  [HonestMemory.PartyMemory.unlock_cell ~ HonestMemory.PartyMemory.unlock_cell :
-   ={cell_addr, key_addr, glob Memory} /\ cell_addr{1} = cell_hon_virt_addr /\
-   gm_invar (glob Memory){1} /\
-   gm_invar_guesser (glob Memory){1} cell_hon_virt_addr cell_phys_addr cont ==>
-   ={res, glob Memory} /\ gm_invar (glob Memory){1} /\
-   (res{1} <> None =>
-    (exists (phys_addr : addr, cell : cell),
-    (oget (gm_to_virt_map (glob Memory){1}).[Honest]).[oget res{1}] =
-    Some phys_addr /\
-    (gm_to_phys_map (glob Memory){1}).[phys_addr] = Some (Cell cell) /\
-    cell.`cont = cont /\ cell.`locked = false))].
-proof.
-conseq
-  (_ :
-   _ ==>
-   ={res, glob Memory} /\
-   (res{1} <> None =>
-    (exists (phys_addr : addr, cell : cell),
-    (oget (gm_to_virt_map (glob Memory){1}).[Honest]).[oget res{1}] =
-    Some phys_addr /\
-    (gm_to_phys_map (glob Memory){1}).[phys_addr] = Some (Cell cell) /\
-    cell.`cont = cont /\ cell.`locked = false)))
-  (_ : gm_invar (glob Memory) ==> gm_invar (glob Memory))
-  (_ : _ ==> _) => //.
-apply HonestMemory.party_memory_unlock_cell_gm_invar.
-proc; inline *; sp 3 3.
-if => //.
-sp 2 2.
-if => //.
-sp 2 2.
-if => //.
-auto => &1 &2 |>.
-rewrite /gm_to_virt_map /gm_to_phys_map /= get_set_sameE oget_some.
-rewrite get_set_sameE /=.
-smt(get_setE).
-auto. auto. auto.
 qed.
 
 type sim_honest_party_state = [
