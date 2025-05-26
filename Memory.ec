@@ -1,6 +1,7 @@
 (* Physical and Party-indexed Virtual Memories
 
-   *** can be used for multiple two party protocols ***
+   *** can be used for multiple two party protocols, where one
+   party is honest and one is (potentially) malicious ***
 
    immutable objects (keys and cells) are stored in the physical
    memory, indexed by addresses (non-negative integers)
@@ -15,7 +16,8 @@
 
    operations are non-destructive, and so create new objects
 
-   keys are represented as unique integers
+   keys are unforgeable and are represented as unique non-negative
+   integers
 
    cells are records consisting of a key (needed to unlock it),
    a boolean contents and a locked status

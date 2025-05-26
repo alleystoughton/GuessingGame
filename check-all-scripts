@@ -33,7 +33,9 @@ check() {
 }
 
 check Memory.ec
-check Guessing.ec
+check Protocol.ec
+check Correctness.ec
+check Security.ec
 
 # success!
 
