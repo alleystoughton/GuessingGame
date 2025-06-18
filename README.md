@@ -23,6 +23,9 @@ and
 [Marco Gaboardi](https://cs-people.bu.edu/gaboardi/) and
 [Jared Pincus](https://jaredpincus.com).
 
+Here are the [slides](../main/fcs2025.pdf) for my 2025 Workshop on
+Foundations of Computer Security (FCS) presentation on this work.
+
 EasyCrypt Theories:
 
  * [`Memory.ec` - physical and party-indexed virtual memories](../main/Memory.ec)
