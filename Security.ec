@@ -2191,7 +2191,8 @@ apply
    (oget (gm_to_next_virt_addr gm).[Honest])
    (oget (gm_to_next_virt_addr gm).[Honest] + 1)
    (gm_to_next_phys_addr gm + 1) (gm_to_next_key gm)).
-progress; smt(get_setE fdom_set fmap_eqP mem_fdom fdomP).
+progress;
+  smt(get_setE fdom_set fmap_eqP mem_fdom fdomP oget_some some_oget).
 wp.
 ((match => //; first auto; smt(RI_Chooser_WaitChoiceFromAdv));
   first auto; exfalso; smt());

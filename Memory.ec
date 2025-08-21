@@ -424,7 +424,7 @@ lemma memory_virt_alloc (gm : gm, pty' : party, phys_addr' : addr) :
      .[oget (gm_to_next_virt_addr gm).[pty'] <- phys_addr'] /\
    res = oget (gm_to_next_virt_addr gm).[pty']].
 proof.
-proc; auto; smt(mem_set rng_set_new get_some get_setE).
+proc; auto; progress; smt(mem_set rng_set_new get_some get_setE).
 qed.
 
 lemma memory_trans_virt_addr_ll :

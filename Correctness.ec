@@ -587,7 +587,7 @@ seq 1 :
      oget Memory.virt_map.[Malicious] = empty.[0 <- 1].[1 <- 0].[2 <- 2])).
 exlim (glob Memory) => gm.
 call (MaliciousMemory.party_memory_unlock_cell gm 0 1).
-auto; progress; smt(mem_set get_setE).
+auto; progress; smt(mem_set get_setE oget_some).
 match Some 1; first auto; smt().
 wp.
 exlim (glob Memory) => gm.

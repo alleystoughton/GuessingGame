@@ -45,5 +45,6 @@ theories using two SMT provers: Alt-Ergo and Z3. It uses a default
 SMT timeout of 2 seconds, but takes the timeout as an optional
 command line argument.
 
-
-
+The scripts check using versions 2.6.0 of Alt-Ergo and 4.15.3 of Z3.
+If you use later versions of these provers and an up-to-date version
+of EasyCrypt, feel free to report any script failures.
