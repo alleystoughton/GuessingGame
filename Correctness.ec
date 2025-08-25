@@ -27,7 +27,8 @@ require import Protocol.
    OtherHonest.Honest : PARTY
 *)
 
-clone Honest as OtherHonest.
+clone Honest as OtherHonest
+proof *.
 
 (********************************* Correctness ********************************)
 
