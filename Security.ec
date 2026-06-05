@@ -530,7 +530,7 @@ conseq
 proc; inline*; sp 2.
 if.
 auto; progress.
-rewrite /gm_invar_guesser /gm_to_honest_virt_map /gm_to_phys_map /=.
+rewrite /gm_invar_guesser /gm_to_phys_map /=.
 rewrite /gm_invar_guesser in H0.
 elim H0 => key locked H0.
 exists key locked.
