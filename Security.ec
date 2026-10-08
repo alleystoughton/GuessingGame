@@ -3014,6 +3014,13 @@ inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).H.to_other.
 match HPS_Chooser_WaitToOtherCellAddr {1} 2; first auto; smt().
 match SHPS_Chooser_WaitToOtherCellAddr {2} 3; first auto; smt().
+seq 0 0 :
+  (#pre /\
+   Honest.Honest.state{1} =
+   Honest.HPS_Chooser_WaitToOtherCellAddr choice' key_addr' cell_addr' /\
+   Simulator.H.state{2} =
+   SHPS_Chooser_WaitToOtherCellAddr key_addr' cell_addr');
+  first auto; smt().
 sp.
 seq 1 1 :
   (={glob Malicious, trans_addr_opt, cell_addr, key_addr} /\
@@ -3027,7 +3034,10 @@ seq 1 1 :
 call
   (honest_trans_virt_addr_of_cell_gm_rel_invar_chooser_equiv cell_addr'
    cell_phys_addr' key' choice').
-auto; progress [-delta]; smt().
+auto => |> &1 &2.
+rewrite /get_as_SHPS_Chooser_WaitToOtherCellAddr /=.
+rewrite /Honest.get_as_HPS_Chooser_WaitToOtherCellAddr /=.
+progress [-delta]; smt().
 match IPS_Chooser_WaitSimGuess {2} 6; first auto; smt().
 auto; progress [-delta].
 rewrite
@@ -3168,9 +3178,9 @@ seq 1 1 :
 call honest_trans_virt_addr_of_cell_gm_invar_chooser_equiv.
 auto; smt().
 match IPS_Chooser_WaitSimOK {2} 7; first auto; smt().
-match SHO_OK {2} 7; first auto.
+match SHO_OK {2} 8; first auto.
 auto; progress [-delta].
-rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result{2}) /#.
+rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ (choice' <> guess')) /#.
 inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
@@ -3200,7 +3210,8 @@ inline Simulator(Malicious).malicious_queue.
 wp.
 call (malicious_party_gm_invar_to_other Malicious).
 auto; progress [-delta]; first 6 smt().
-rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
+case result_R => [/= | _ /=];
+  rewrite (RI_Chooser_WaitResultToAdv _ _ _ _ _ result') /#.
 (* ri_chooser_wait_error_to_adv *)
 move => invar_ri_chooser_wait_error_to_adv.
 conseq
@@ -3315,7 +3326,7 @@ inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).H.to_other.
 match HPS_Guesser_WaitToOtherGuess {1} 2; first auto; smt().
 match SHPS_Guesser_WaitToOtherGuess {2} 3; first auto; smt().
-match IPS_Guesser_WaitSimOK {2} 8; first auto; smt().
+match IPS_Guesser_WaitSimOK {2} 9; first auto; smt().
 auto; progress [-delta]; first smt().
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
@@ -3348,7 +3359,7 @@ inline RealProtocol(Honest.Honest, Malicious).H.to_other
        Simulator(Malicious).H.to_other.
 match HPS_Guesser_WaitFromOtherKeyAddr {1} 2; first auto; smt().
 match SHPS_Guesser_WaitFromOtherKeyAddr {2} 3; first auto; smt().
-match IPS_Guesser_WaitSimOK {2} 6; first auto; smt().
+match IPS_Guesser_WaitSimOK {2} 7; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Guesser_WaitKeyAddrFromOther _ _ _ _ _
@@ -3509,7 +3520,7 @@ inline Simulator(Malicious).honest_deliver.
 sp.
 match => //.
 match IPS_Chooser_WaitSimGuess {2} 2; first auto; smt().
-match SHO_Nothing {2} 2; first auto; smt().
+match SHO_Nothing {2} 3; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Chooser_WaitCellAddrToOther _ _ _ _ _
@@ -3519,10 +3530,10 @@ inline RealProtocol(Honest.Honest, Malicious).H.from_other
        Simulator(Malicious).H.from_other.
 match HPS_Chooser_WaitToOtherCellAddr {1} 3; first auto; smt().
 match SHPS_Chooser_WaitToOtherCellAddr {2} 4; first auto; smt().
-rcondf{1} 4; first auto; smt().
-rcondf{2} 5; first auto; smt().
-match IPS_Chooser_WaitSimGuess {2} 6; first auto; smt().
-match SHO_Nothing {2} 6; first auto; smt().
+rcondf{1} 5; first auto; smt().
+rcondf{2} 6; first auto; smt().
+match IPS_Chooser_WaitSimGuess {2} 7; first auto; smt().
+match SHO_Nothing {2} 8; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Chooser_WaitCellAddrToOther _ _ _ _ _
@@ -3559,7 +3570,7 @@ match => //.
 inline Simulator(Malicious).honest_deliver; sp.
 match => //.
 match IPS_Chooser_WaitSimGuess {2} 2; first auto; smt().
-match SHO_Nothing {2} 2; first auto; smt().
+match SHO_Nothing {2} 3; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Chooser_WaitGuessFromOther _ _ _ _ _
@@ -3569,35 +3580,44 @@ inline RealProtocol(Honest.Honest, Malicious).H.from_other
        Simulator(Malicious).H.from_other.
 match HPS_Chooser_WaitFromOtherGuess {1} 3; first auto; smt().
 match SHPS_Chooser_WaitFromOtherGuess {2} 4; first auto; smt().
-sp.
-elim* => state_R state_L.
+seq 0 0 :
+  (#pre /\
+   Honest.Honest.state{1} =
+   Honest.HPS_Chooser_WaitFromOtherGuess choice' key_addr' /\
+   Simulator.H.state{2} =
+   SHPS_Chooser_WaitFromOtherGuess key_addr' cell_addr');
+  first auto; smt().
+sp; elim* => state_R state_L.
 case (get_as_Guess msg{1} <> None).
 match Guess {1} 1; first auto; smt().
 match Guess {2} 1; first auto; smt().
 rcondt{1} 3; first auto; smt().
 rcondt{2} 4; first auto; smt().
 match IPS_Chooser_WaitSimGuess {2} 6; first auto; smt().
-match SHO_Guess {2} 6; first auto; smt().
+match SHO_Guess {2} 7; first auto; smt().
 inline Simulator(Malicious).honest_choice.
-match SHPS_Chooser_WaitFromIPChoice {2} 8; first auto; smt().
+match SHPS_Chooser_WaitFromIPChoice {2} 9; first auto; smt().
 sp; wp; elim* =>
   to_honest_queue_R sho_r state_R0 sho0R to_honest_queue_L state_L0.
 exlim (glob Memory){1} => gm1.
 call{2}
   (simulator_modify_cell_gm_rel_invar_chooser gm1 cell_addr' cell_phys_addr'
    key' choice').
-auto; progress [-delta].
-rewrite /get_as_SHPS_Chooser_WaitFromIPChoice /= /# in H.
+auto => |> &1 &2.
+rewrite /get_as_SHPS_Chooser_WaitFromIPChoice /=.
+rewrite /Honest.get_as_HPS_Chooser_WaitFromOtherGuess /=.
+rewrite /get_as_SHPS_Chooser_WaitFromOtherGuess /=.
+progress [-delta].
 smt(). smt().
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
-   choice{1} key_addr' guess{2}) /#.
-seq 1 1 : (#pre).
-auto; smt().
+   (oget (get_as_IPS_Chooser_WaitSimGuess IdealProtocol.state{2}))
+   key_addr{2} guess{2}) /#.
+seq 1 1 : (#pre); first auto; smt().
 rcondt{1} 2; first auto; smt().
 rcondt{2} 2; first auto; smt().
 match IPS_Chooser_WaitSimGuess {2} 4; first auto; smt().
-match SHO_Error {2} 4; first auto; smt().
+match SHO_Error {2} 5; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Chooser_WaitErrorToAdv_GMRelInvarChooser _ _ _ _ _
@@ -3737,9 +3757,9 @@ inline RealProtocol(Honest.Honest, Malicious).H.from_other
        Simulator(Malicious).H.from_other.
 match HPS_Chooser_WaitToOtherKeyAddr {1} 3; first auto; smt().
 match SHPS_Chooser_WaitToOtherKeyAddr {2} 4; first auto; smt().
-rcondf{1} 4; first auto.
-rcondf{2} 5; first auto.
-match IPS_Chooser_WaitSimOK {2} 6; first auto; smt().
+rcondf{1} 5; first auto.
+rcondf{2} 6; first auto.
+match IPS_Chooser_WaitSimOK {2} 7; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Chooser_WaitKeyAddrToOther _ _ _ _ _
@@ -3778,7 +3798,7 @@ inline RealProtocol(Honest.Honest, Malicious).H.from_other
        Simulator(Malicious).H.from_other.
 match HPS_Chooser_WaitToAdvResult {1} 3; first auto; smt().
 match SHPS_Chooser_Final {2} 4; first auto; smt().
-rcondf{1} 4; first auto.
+rcondf{1} 5; first auto.
 rcondf{2} 5; first auto.
 match IPS_Chooser_WaitToAdvResult {2} 6; first auto; smt().
 auto; progress [-delta].
@@ -3914,7 +3934,7 @@ inline Simulator(Malicious).honest_deliver; sp.
 match => //.
 match IPS_Guesser_WaitSimChoice {2} 2; first auto; smt().
 auto; progress [-delta].
-match SHO_Nothing {2} 2; first auto; smt().
+match SHO_Nothing {2} 3; first auto; smt().
 auto; progress [-delta].
 rewrite (RI_Guesser_WaitCellAddrFromOther _ _ _ _ _ guess') /#.
 move => msg1 msgs1 msg2 msgs2.
@@ -3923,7 +3943,7 @@ inline RealProtocol(Honest.Honest, Malicious).H.from_other
 match HPS_Guesser_WaitFromOtherCellAddr {1} 3; first auto; smt().
 match SHPS_Guesser_WaitFromOtherCellAddr {2} 4; first auto; smt().
 case (get_as_CellAddr msg1 <> None).
-match CellAddr {1} 5; first auto; smt().
+match CellAddr {1} 6; first auto; smt().
 match CellAddr {2} 7; first auto; smt().
 sp; elim* => state_R state_L.
 case (cell_addr_good Honest (glob Memory){1} cell_addr{1}).
@@ -3946,17 +3966,23 @@ rcondt{1} 1; first auto.
 rcondt{1} 3; first auto.
 rcondt{2} 4; first auto.
 match IPS_Guesser_WaitSimChoice {2} 6; first auto; smt().
-match SHO_Choice {2} 6; first auto; smt().
+seq 0 0 :
+  (#pre /\ IdealProtocol.state{2} = IPS_Guesser_WaitSimChoice guess');
+  first auto; smt().
+match SHO_Choice {2} 7; first auto; smt().
 inline Simulator(Malicious).honest_guess.
-match SHPS_Guesser_WaitFromIPGuess {2} 8; first auto; smt().
+match SHPS_Guesser_WaitFromIPGuess {2} 9; first auto; smt().
 auto; progress [-delta].
 pose cell := cell_addr_to_cell Honest (glob Memory){1} cell_addr{2}.
+rewrite /get_as_IPS_Guesser_WaitSimChoice /=.
+rewrite /get_as_SHO_Choice /=.
+rewrite /get_as_SHPS_Guesser_WaitFromIPGuess /=.
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
    guess{1} cell_addr{2}
    (oget (oget Memory.virt_map{1}.[Honest]).[cell_addr{2}])
-   cell.`cont (guess{2} = cell.`cont)).
-progress; smt(get_some).
+   cell.`cont (guess' = cell.`cont)).
+smt(get_some).
 seq 1 1 : (#pre /\ ! b0{1} /\ choice_opt{2} = None).
 exlim (glob Memory){1}, cell_addr{1} => gm cell_addr'.
 call (is_cell_read_cell_bad gm cell_addr').
@@ -3964,10 +3990,10 @@ auto; smt().
 rcondf{1} 1; first auto.
 match None {2} 1; first auto.
 match IPS_Guesser_WaitSimChoice {2} 4; first auto; smt().
-match SHO_Error {2} 4; first auto.
+match SHO_Error {2} 5; first auto.
 auto; progress [-delta].
 rewrite RI_Guesser_WaitErrorToAdv /#.
-sp 4 6; elim* => state_R state_L.
+sp 5 6; elim* => state_R state_L.
 seq 1 1 : (#pre).
 match => //.
 move => cell_addr1 cell_addr2.
@@ -3975,7 +4001,7 @@ exfalso; smt().
 rcondt{1} 2; first auto.
 rcondt{2} 2; first auto.
 match IPS_Guesser_WaitSimChoice {2} 4; first auto; smt().
-match SHO_Error {2} 4; first auto.
+match SHO_Error {2} 5; first auto.
 auto; progress [-delta].
 rewrite RI_Guesser_WaitErrorToAdv /#.
 inline Simulator(Malicious).malicious_deliver.
@@ -4013,9 +4039,9 @@ inline RealProtocol(Honest.Honest, Malicious).H.from_other
        Simulator(Malicious).H.from_other.
 match HPS_Guesser_WaitToOtherGuess {1} 3; first auto; smt().
 match SHPS_Guesser_WaitToOtherGuess {2} 4; first auto; smt().
-rcondf{1} 4; first auto.
-rcondf{2} 5; first auto.
-match IPS_Guesser_WaitSimOK {2} 6; first auto; smt().
+rcondf{1} 5; first auto.
+rcondf{2} 6; first auto.
+match IPS_Guesser_WaitSimOK {2} 7; first auto; smt().
 auto; progress [-delta].
 rewrite
   (RI_Guesser_WaitGuessToOther _ _ _ _ _
@@ -4061,7 +4087,7 @@ inline RealProtocol(Honest.Honest, Malicious).H.from_other
        Simulator(Malicious).H.from_other.
 match HPS_Guesser_WaitFromOtherKeyAddr {1} 3; first auto; smt().
 match SHPS_Guesser_WaitFromOtherKeyAddr {2} 4; first auto; smt().
-sp 4 6; elim* => state_r state_L.
+sp 5 7; elim* => state_r state_L.
 case (get_as_KeyAddr msg{1} <> None).
 match KeyAddr {1} 1; first auto; smt().
 match KeyAddr {2} 1; first auto; smt().
@@ -4090,13 +4116,13 @@ case (unlocked_cell_addr_opt{1} = None).
 match None {1} 1; first auto.
 match None {2} 1; first auto.
 match IPS_Guesser_WaitSimOK {2} 4; first auto; smt().
-match SHO_Error {2} 4; first auto.
+match SHO_Error {2} 5; first auto.
 auto; progress [-delta]; last smt().
 rewrite RI_Guesser_WaitErrorToAdv /#.
 match Some {1} 1; first auto; smt().
 match Some {2} 1; first auto; smt().
 match IPS_Guesser_WaitSimOK {2} 6; first auto; smt().
-match SHO_OK {2} 6; first auto; smt().
+match SHO_OK {2} 7; first auto; smt().
 wp; exlim (glob Memory){1}, unlocked_cell_addr{1} => gm unlocked_cell_addr'.
 call{1}
   (_ :
@@ -4118,7 +4144,7 @@ match => //.
 move => key_addr1 key_addr2.
 exfalso; smt().
 match IPS_Guesser_WaitSimOK {2} 4; first auto; smt().
-match SHO_Error {2} 4; first auto.
+match SHO_Error {2} 5; first auto.
 auto; progress [-delta].
 rewrite RI_Guesser_WaitErrorToAdv /#.
 inline Simulator(Malicious).malicious_deliver.
